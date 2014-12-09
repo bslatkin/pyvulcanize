@@ -61,11 +61,13 @@ def traverse(relative_url, path):
             dep_path = relative_url_to_path(node.relative_url, node.path, dep)
             logging.debug('Dependency %r has file path %r', dep, dep_path)
             if dep_path in seen_paths:
+                logging.debug('%r already seen', dep_path)
                 continue
             seen_paths.add(dep_path)
             dep_node = ImportedFile(dep, dep_path)
             all_nodes.add(dep_node)
             to_process.append(dep_node)
+    return all_nodes
 
 
 logging.getLogger().setLevel(logging.DEBUG)
