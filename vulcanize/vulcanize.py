@@ -21,7 +21,7 @@ class PathResolver(object):
         self.root_dir = os.path.dirname(index_path)
         self.root_url = os.path.dirname(index_relative_url)
 
-    def get_path(self, parent_relative_url, relative_url):
+    def __call__(self, parent_relative_url, relative_url):
         # Resolve the other_relative_url in the same directory as
         # the parent_relative_url.
         resolved_relative_url = os.path.join(
@@ -37,7 +37,7 @@ class PathResolver(object):
 
 class ImportedHtml(object):
 
-    resolver = None
+    get_path = None
 
     def __init__(self, relative_url, path):
         self.relative_url = relative_url
@@ -73,7 +73,7 @@ class ImportedHtml(object):
 
 class ImportedScript(object):
 
-    resolver = None
+    get_path = None
 
     def __init__(self, parent_relative_url, script_el):
         self.el = None
@@ -100,8 +100,7 @@ class ImportedScript(object):
             else:
                 logging.debug('Found script %r in %r',
                               script_src, parent_relative_url)
-                self.path = self.resolver.get_path(
-                    parent_relative_url, script_src)
+                self.path = self.get_path(parent_relative_url, script_src)
                 logging.debug('Script %r has file path %r',
                               script_src, self.path)
                 self.text = open(self.path).read()
@@ -127,7 +126,7 @@ def traverse(relative_url, index_path):
         node = to_process.popleft()
         for dep in node.dependencies:
             logging.debug('Found dependency %r in %r', dep, node.path)
-            dep_path = node.resolver.get_path(node.relative_url, dep)
+            dep_path = node.get_path(node.relative_url, dep)
             logging.debug('Dependency %r has file path %r', dep, dep_path)
             if dep_path in seen_paths:
                 logging.debug('%r already seen', dep_path)
@@ -177,8 +176,8 @@ def merge_nodes(all_nodes):
 logging.getLogger().setLevel(logging.DEBUG)
 
 resolver = PathResolver('./example/index.html', 'index.html')
-ImportedHtml.resolver = resolver
-ImportedScript.resolver = resolver
+ImportedHtml.get_path = resolver
+ImportedScript.get_path = resolver
 
 all_nodes = traverse('index.html', './example/index.html')
 head_tags, polymer_elements, scripts = merge_nodes(all_nodes)
