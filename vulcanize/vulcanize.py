@@ -13,6 +13,10 @@ def is_import_element(el):
     return el.tag == 'link' and el.attrib.get('rel') == 'import'
 
 
+def is_polymer_element(el):
+    return el.tag == 'polymer-element'
+
+
 class PathResolver(object):
 
     def __init__(self, index_path, index_relative_url):
@@ -51,7 +55,7 @@ class ImportedHtml(object):
         self.tree = html.parse(self.path, base_url=self.relative_url)
 
         for el in self.tree.findall('/head/*'):
-            if not is_import_element(el):
+            if not is_import_element(el) and not is_polymer_element(el):
                 self.head_tags.append(el)
 
         self.polymer_elements = self.tree.findall('//polymer-element')
@@ -164,15 +168,6 @@ def merge_nodes(all_nodes):
     return head_tags, polymer_elements, scripts
 
 
-# def combined_scripts(scripts):
-#     result_script = []
-#     for el in scripts:
-#         if el.attrib.get('src'):
-
-#         else:
-#             result_script.append(el.text)
-
-
 logging.getLogger().setLevel(logging.DEBUG)
 
 resolver = PathResolver('./example/index.html', 'index.html')
@@ -182,4 +177,6 @@ ImportedScript.get_path = resolver
 all_nodes = traverse('index.html', './example/index.html')
 head_tags, polymer_elements, scripts = merge_nodes(all_nodes)
 
+print head_tags
+print polymer_elements
 print scripts
