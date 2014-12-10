@@ -20,7 +20,9 @@ from lxml import html
 import os.path
 
 
-# TODO assert we have relative URLs everywhere, not absolute
+# TODO: assert we have relative URLs everywhere, not absolute
+# TODO: Don't manipulate the original etrees because we want to be able to
+# generate sourcemaps that point back to the original script locations.
 
 
 def is_import_element(el):
@@ -94,7 +96,7 @@ class ImportedScript(object):
     get_path = None
 
     def __init__(self, parent_relative_url, script_el):
-        self.el = None
+        self.el = script_el
         self.path = None
         self.text = ''
         try:
@@ -132,27 +134,45 @@ class ImportedScript(object):
             return repr(self.text)
 
 
+class FileIndex(object):
+
+    def __init__(self):
+        self.index = {}
+
+    def add(self, relative_url, path):
+        assert relative_url
+        assert path
+        self.index[relative_url] = path
+
+    def get_source_line(self, relative_url, line_number):
+        path = self.index[relative_url]
+        open(path).read()
+
+
 def traverse(relative_url, index_path):
+    """
+    Breadth-first search. Order of returned nodes matters because
+    that's dependency order.
+    """
     root = ImportedHtml(relative_url, index_path)
     root.parse()
     all_nodes = [root]
-    seen_paths = {root}
+    seen_paths = {}
     to_process = deque([root])
 
     while to_process:
-        print to_process
         node = to_process.popleft()
         for dep in node.dependencies:
             logging.debug('Found dependency %r in %r', dep, node.path)
             dep_path = node.get_path(node.relative_url, dep)
             logging.debug('Dependency %r has file path %r', dep, dep_path)
             if dep_path in seen_paths:
-                logging.debug('%r already seen', dep_path)
+                logging.debug('Already seen %r', dep_path)
                 continue
 
-            seen_paths.add(dep_path)
             dep_node = ImportedHtml(dep, dep_path)
             dep_node.parse()
+            seen_paths[dep_path] = dep_node
             all_nodes.append(dep_node)
             to_process.append(dep_node)
 
@@ -160,6 +180,10 @@ def traverse(relative_url, index_path):
 
 
 def merge_nodes(all_nodes):
+    """
+    Order of returned values matters because that's in dependency order
+    based on the supplied nodes.
+    """
     head_tags = []
     polymer_elements = []
     scripts = []
@@ -167,14 +191,12 @@ def merge_nodes(all_nodes):
     for dep_node in all_nodes:
         for el in dep_node.head_tags:
             if el.tag == 'script':
-                el.getparent().remove(el)
                 scripts.append(ImportedScript(dep_node.relative_url, el))
             else:
                 head_tags.append(el)
 
         for el in dep_node.polymer_elements:
             for script_el in el.findall('script'):
-                el.remove(script_el)
                 scripts.append(ImportedScript(
                     dep_node.relative_url, script_el))
             polymer_elements.append(el)
@@ -194,3 +216,5 @@ head_tags, polymer_elements, scripts = merge_nodes(all_nodes)
 print head_tags
 print polymer_elements
 print scripts
+
+import pdb; pdb.set_trace()
