@@ -1,7 +1,13 @@
+This is still a work in progress. It is not functional.
 
+#### TODO:
+
+- Output a vulcanized HTML file
+- Output a concatenated JavaScript file
+- Generate source maps for the JavaScript files
+- WSGI component for serving vulcanized files and original sources
 
 ### To test the example
-
 
 #### 1. The JavaScript stuff
 
