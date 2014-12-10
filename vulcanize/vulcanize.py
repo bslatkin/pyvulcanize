@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from collections import deque
+from copy import deepcopy
 import logging
 from lxml import html
 import os.path
@@ -31,7 +32,8 @@ class InvalidScriptError(Error):
 # TODO: assert we have relative URLs everywhere, not absolute
 # TODO: Don't manipulate the original etrees because we want to be able to
 # generate sourcemaps that point back to the original script locations.
-
+# TODO: Explicitly import style and link tags from children, ignore everything
+# else. Only preserve other head tags from the root file.
 
 def is_import_element(el):
     return el.tag == 'link' and el.attrib.get('rel') == 'import'
@@ -256,26 +258,42 @@ TEMPLATE = """<!doctype html>
 </html>
 """
 
-def assemble(head_tags, polymer_elements, scripts, body):
+def assemble(root_file, head_tags, polymer_elements, scripts):
     root_el = html.Element('html')
+
     head_el = html.Element('head')
     root_el.append(head_el)
+
+    for tag in head_tags:
+        copied = deepcopy(tag)
+        head_el.append(copied)
+
     body_el = html.Element('body')
     root_el.append(body_el)
 
+    hidden_el = html.Element('div', attrib={'hidden': 'hidden'})
+    body_el.append(hidden_el)
+
+    for tag in polymer_elements:
+        copied = deepcopy(tag)
+        # Remove all scripts from Polymer elements since these will
+        # be in the vulcanized JS file.
+        for el in copied.findall('script'):
+            copied.remove(el)
+        hidden_el.append(copied)
+
     print html.tostring(root_el)
-    return root
+    return root_el
 
 
 logging.getLogger().setLevel(logging.DEBUG)
 
 resolver = PathResolver('', './example/')
-root = resolver.resolve_html('index.html')
-all_nodes, file_index = traverse(root, resolver)
+root_file = resolver.resolve_html('index.html')
+all_nodes, file_index = traverse(root_file, resolver)
 head_tags, polymer_elements, scripts = merge_nodes(
     all_nodes, file_index, resolver)
-body = extract_body(root)
 
-assemble(head_tags, polymer_elements, scripts, body)
+assemble(root_file, head_tags, polymer_elements, scripts)
 
 import pdb; pdb.set_trace()
