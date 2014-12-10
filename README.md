@@ -1,6 +1,9 @@
 
 
-#### To test the example
+### To test the example
+
+
+#### 1. The JavaScript stuff
 
 This section makes me want to scream, but alas this is how it is.
 
@@ -29,3 +32,29 @@ That will create a directory called `node_modules` somewhere in your project dir
 ```
 
 If that worked, you'll see a file named `bower_components/webcomponentsjs/webcomponents.js` in the `example` directory.
+
+#### 2. The Python stuff
+
+Now go back to the main project directory. Make sure you have `virtualenv` installed for Python 2.7:
+
+```
+pip install virtualenv
+```
+
+Create a new virtual environment for the project in the project's root directory.
+
+```
+virtualenv .
+```
+
+Activate the virtual environment:
+
+```
+source bin/activate
+```
+
+Then install all of the requirements for the Python part of the project:
+
+```
+pip install -r ./requirements.txt
+```
