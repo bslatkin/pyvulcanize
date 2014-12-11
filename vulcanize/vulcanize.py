@@ -19,6 +19,7 @@ from copy import deepcopy
 import logging
 from lxml import html
 import os.path
+from cStringIO import StringIO
 
 
 class Error(Exception):
@@ -61,6 +62,7 @@ class ImportedHtml(ImportedFile):
         self.link_tags = []
         self.polymer_tags = []
         self.head_tags = []
+        self.body_tags = []
 
     def parse(self):
         self.el = html.parse(self.path)
@@ -92,12 +94,19 @@ class ImportedHtml(ImportedFile):
         self.polymer_tags = self.el.findall('//polymer-element')
         seen_tags.update(self.polymer_tags)
 
-        # Track everything else from head that isn't a tag we already found.
+        # Save everything from head and body that aren't tags we've
+        # already seen through the xpath queries above.
         for el in self.el.findall('/head/*'):
             if el in seen_tags:
                 continue
             else:
                 self.head_tags.append(el)
+
+        for el in self.el.findall('/body/*'):
+            if el in seen_tags:
+                continue
+            else:
+                self.body_tags.append(el)
 
 
 class ImportedScript(ImportedFile):
@@ -294,18 +303,13 @@ def merge_nodes(all_nodes, file_index, resolver):
         link_tags=link_tags)
 
 
-def extract_body(root):
-    body_nodes = root.tree.findall('//body')
-    assert len(body_nodes) == 1
-    return body_nodes[0]
+def assemble_scripts(merged):
+    output = StringIO()
+    for tag in merged.script_tags:
+        output.write(tag.text)
+        output.write(';\n')
+    return output.getvalue()
 
-
-TEMPLATE = """<!doctype html>
-<html>
-<head></head>
-<body></body>
-</html>
-"""
 
 def assemble(root_file, merged):
     root_el = html.Element('html')
@@ -324,13 +328,6 @@ def assemble(root_file, merged):
         copied.tail = ''
         head_el.append(copied)
 
-    for tag in merged.script_tags:
-        if not tag.path and not tag.text:
-            # This is an external script that can't be resolved to
-            # a local path and thus can't be vulcanized.
-            copied = deepcopy(tag.el)
-            head_el.append(copied)
-
     body_el = html.Element('body')
     root_el.append(body_el)
 
@@ -346,6 +343,31 @@ def assemble(root_file, merged):
         for el in copied.findall('link'):
             copied.remove(el)
         hidden_el.append(copied)
+
+    for tag in root_file.body_tags:
+        copied = deepcopy(tag)
+        body_el.append(copied)
+
+    # TODO: Split this into a separate file that can have a sourcemap.
+    combined_script = StringIO()
+
+    for tag in merged.script_tags:
+        if tag.text:
+            combined_script.write(tag.text)
+            combined_script.write('\n;\n')
+        elif tag.path:
+            with open(tag.path) as handle:
+                combined_script.write(handle.read())
+                combined_script.write('\n;\n')
+        else:
+            # This is an external script that can't be resolved to
+            # a local path and thus can't be vulcanized.
+            copied = deepcopy(tag.el)
+            head_el.append(copied)
+
+    combined_el = html.Element('script', attrib={'type': 'text/javascript'})
+    combined_el.text = combined_script.getvalue().decode('utf-8')
+    body_el.append(combined_el)
 
     return root_el
 
