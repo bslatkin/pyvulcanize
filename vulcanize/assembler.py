@@ -98,11 +98,11 @@ def assemble(root_file, traverse):
     for tag in traverse(root_file):
         logging.debug('Traversing %r', tag)
 
-        if isinstance(tag, ImportedLink):
+        if isinstance(tag, importer.ImportedLink):
             # External link that can't be vulcanized.
             copied = deepcopy(tag.el)
             head_el.append(copied)
-        elif isinstance(tag, ImportedScript):
+        elif isinstance(tag, importer.ImportedScript):
             if tag.text:
                 if tag.relative_url:
                     combined_script.write('\n// %s\n' % tag.relative_url)
@@ -116,7 +116,7 @@ def assemble(root_file, traverse):
                 logging.debug('Adding script src %r', html.tostring(tag.el))
                 copied.attrib['src'] = tag.relative_url
                 head_el.append(copied)
-        elif isinstance(tag, ImportedHtml):
+        elif isinstance(tag, importer.ImportedHtml):
             for child_tag in tag.polymer_tags:
                 copied = deepcopy(child_tag)
                 # Remove any child script and link tags from Polymer elements

@@ -21,7 +21,7 @@ from . pipeline import vulcanize
 
 def main():
     logging.getLogger().setLevel(logging.DEBUG)
-    result = vulcanize('./example', './example/index.html')
+    result = vulcanize('index.html', './example/index.html')
     print result
 
 

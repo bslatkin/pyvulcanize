@@ -26,7 +26,7 @@ __all__ = ['vulcanize']
 def vulcanize(index_relative_url, index_path):
     resolver = importer.PathResolver(index_relative_url, index_path)
     import_tag = importer.Importer(resolver)
-    root_file = import_tag.import_html(index_path)
+    root_file = import_tag.import_html(index_relative_url)
     root_file.parse()
     traverser = assembler.Traverser(import_tag)
     root_el = assembler.assemble(root_file, traverser)
