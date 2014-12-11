@@ -180,8 +180,6 @@ class ImportedPolymerElement(ImportedTag):
             relative_url=None, path=None, el=polymer_el)
 
     def parse(self):
-        # TODO: If this is a stylesheet inline, we need to put it
-        # back inside the <template> element.
         for child_el in self.el.findall('.//*'):
             if child_el.tag not in ('script', 'link'):
                 continue
@@ -274,7 +272,6 @@ class Importer(object):
             return ImportedScript(script_el, text=script_el.text)
         else:
             # The script is an external resource so we shouldn't vulcanize.
-            # TODO: Consider doing this in the future.
             relative_url, _ = self.resolve(
                 script_src, parent_relative_url=parent_relative_url)
             return ImportedScript(script_el, relative_url=relative_url)

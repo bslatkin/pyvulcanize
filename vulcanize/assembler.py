@@ -127,6 +127,7 @@ def assemble(root_file, traverse):
 
         if isinstance(tag, importer.ImportedLink):
             if tag.replacement is not None:
+                # CSS that can be inlined.
                 tag.el.addprevious(tag.replacement)
                 remove_node(tag.el)
             else:
@@ -142,7 +143,7 @@ def assemble(root_file, traverse):
                 combined_script.write(tag.text)
                 combined_script.write('\n;\n')
             else:
-                # External link that can't be vulcanized.
+                # External script that can't be vulcanized.
                 copied = copy_clean(tag.el)
                 remove_node(tag.el)
                 head_el.append(copied)
