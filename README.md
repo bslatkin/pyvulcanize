@@ -1,15 +1,28 @@
-This is still a work in progress. It is not functional.
+# pyvulcanize
 
-#### TODO:
+*This is still a work in progress.*
 
-- Output a vulcanized HTML file
+A pure Python implementation of the [vulcanize tool](https://github.com/Polymer/vulcanize) that is part of the [Polymer project](https://www.polymer-project.org).
+
+Why Python? Because our server is written in Python. I don't want to run node.js on the side during development just to regenerate vulcanized files on the fly. Oh-- and I want vulcanized files during development because the number of static resources I need to load for a large project gets excruciatingly slow to transfer, even on localhost (there are just too many HTTP requests to make).
+
+## TODO:
+
 - Output a concatenated JavaScript file
 - Generate source maps for the JavaScript files
 - WSGI component for serving vulcanized files and original sources
+- setup.py and pypi
+- tests
 
-### To test the example
+## Using the tool
 
-#### 1. The JavaScript stuff
+TODO: Write this
+
+## Test the tool during development
+
+Read this if you want to edit this code and contribute. Please send edits as pull requests.
+
+### 1. Dependencies
 
 This section makes me want to scream, but alas this is how it is.
 
@@ -39,9 +52,19 @@ That will create a directory called `node_modules` somewhere in your project dir
 
 If that worked, you'll see a file named `bower_components/webcomponentsjs/webcomponents.js` in the `example` directory.
 
-#### 2. The Python stuff
+### 2. Using the JS tool
 
-Now go back to the main project directory. Make sure you have `virtualenv` installed for Python 2.7:
+This is how you use the [official version of vulcanize](https://github.com/Polymer/vulcanize) to produce the desired output.
+
+In the example directory use the vulcanize tool (`npm install vulcanize`) to generate the expected output. Note you need to use the "content security policy" flag to have it generate an external JS file.
+
+```
+ ./node_modules/vulcanize/bin/vulcanize --csp -o official_test.html ./index.html
+```
+
+### 3. Using the Python tool
+
+Go to the main project directory. Make sure you have `virtualenv` installed for Python 2.7:
 
 ```
 pip install virtualenv
@@ -65,10 +88,20 @@ Then install all of the requirements for the Python part of the project:
 pip install -r ./requirements.txt
 ```
 
-#### Reproducing the existing output
-
-In the example directory use the vulcanize tool (`npm install vulcanize`) to generate the expected output. Note you need to use the "content security policy" flag to have it generate an external JS file.
+From the project root directory, you should be able to run the commandline tool with:
 
 ```
- ./node_modules/vulcanize/bin/vulcanize --csp -o official_test.html ./index.html
+python -m vulcanize ./example/index.html -o ./example/test.html
 ```
+
+To see if it worked, run a Python server locally:
+
+```
+python -m SimpleHTTPServer 8080 ./example
+```
+
+And then visit <http://localhost:8080/test.html>. If you see a big green square with JS on it, you're good.
+
+## About
+
+Written by [Brett Slatkin](http://www.onebigfluke.com)
