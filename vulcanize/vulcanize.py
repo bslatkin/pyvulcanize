@@ -18,7 +18,6 @@ from collections import deque, namedtuple
 from copy import deepcopy
 import logging
 from lxml import html
-from lxml.html import html5parser
 import os.path
 
 
@@ -64,7 +63,7 @@ class ImportedHtml(ImportedFile):
         self.head_tags = []
 
     def parse(self):
-        self.el = html5parser.parse(self.path)
+        self.el = html.parse(self.path)
 
         seen_tags = set()
 
@@ -320,9 +319,9 @@ def assemble(root_file, merged):
 
     for tag in merged.link_tags:
         copied = deepcopy(tag.el)
-        print '!!!'
-        print html.tostring(copied)
-        print '!!!'
+        # Clear any funky tail text that may be after certain html elements
+        # like <link> with no closing </link> tag.
+        copied.tail = ''
         head_el.append(copied)
 
     for tag in merged.script_tags:
@@ -359,6 +358,6 @@ all_nodes, file_index = traverse(root_file, resolver)
 merged = merge_nodes(all_nodes, file_index, resolver)
 root_el = assemble(root_file, merged)
 
-print html.tostring(root_el)
+print html.tostring(root_el, doctype='<!doctype html>')
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
