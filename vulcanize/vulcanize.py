@@ -229,29 +229,23 @@ class FileIndex(object):
         open(path).read()
 
 
-def traverse(root, resolver):
+def traverse(node, resolver, file_index):
     """
     Breadth-first search. Order of returned nodes matters because
     that's dependency order.
     """
-    all_nodes = [root]
-    file_index = FileIndex()
-    to_process = deque([root])
+    node.parse()
+    if not file_index.add(node.relative_url, node.path):
+        return []
 
-    while to_process:
-        node = to_process.popleft()
-        node.parse()
-        if not file_index.add(node.relative_url, node.path):
-            continue
+    all_nodes = []
 
-        all_nodes.append(node)
+    for relative_url in node.dependencies:
+        dep = resolver.resolve_html(
+            relative_url, parent_relative_url=node.relative_url)
+        all_nodes.extend(traverse(dep, resolver, file_index))
 
-        for relative_url in node.dependencies:
-            dep = resolver.resolve_html(
-                relative_url, parent_relative_url=node.relative_url)
-            to_process.append(dep)
-
-    return all_nodes, file_index
+    return all_nodes + [node]
 
 
 MergedDependencies = namedtuple(
@@ -382,7 +376,8 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 resolver = PathResolver('', './example/')
 root_file = resolver.resolve_html('index.html')
-all_nodes, file_index = traverse(root_file, resolver)
+file_index = FileIndex()
+all_nodes = traverse(root_file, resolver, file_index)
 merged = merge_nodes(all_nodes, file_index, resolver)
 root_el = assemble(root_file, merged)
 
