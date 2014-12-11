@@ -14,7 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = []
+import logging
 
-from . pipeline import *
-__all__ += pipeline.__all__
+from . pipeline import vulcanize
+
+
+def main():
+    logging.getLogger().setLevel(logging.DEBUG)
+    result = vulcanize('./example', './example/index.html')
+    print result
+
+
+if __name__ == '__main__':
+    main()

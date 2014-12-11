@@ -14,7 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = []
+from lxml import html
 
-from . pipeline import *
-__all__ += pipeline.__all__
+from . import assembler
+from . import importer
+
+
+__all__ = ['vulcanize']
+
+
+def vulcanize(index_relative_url, index_path):
+    resolver = importer.PathResolver(index_relative_url, index_path)
+    import_tag = importer.Importer(resolver)
+    root_file = import_tag.import_html(index_path)
+    root_file.parse()
+    traverser = assembler.Traverser(import_tag)
+    root_el = assembler.assemble(root_file, traverser)
+    return html.tostring(root_el, doctype='<!doctype html>')

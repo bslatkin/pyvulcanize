@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import deque, namedtuple
-from copy import deepcopy
-from cStringIO import StringIO
 import logging
 from lxml import html
 import os.path
 import re
+
+
+# TODO: Handle no-script Polymer elements that don't explicitly call Polymer()
 
 
 class Error(Exception):
@@ -35,16 +35,12 @@ class InvalidLinkError(Error):
     pass
 
 
-# TODO: Handle no-script Polymer elements that don't explicitly call Polymer()
-# TODO: Rewrite Polymer() constructor calls.
-
 class ImportedFile(object):
 
     def __init__(self, relative_url, path, el):
         self.relative_url = relative_url
         self.path = path
         self.el = el
-        self.dependencies = []
         self.resource_tags = []
 
     def __repr__(self):
@@ -162,7 +158,7 @@ class PathResolver(object):
         self.root_url = os.path.dirname(index_relative_url)
         self.root_dir = os.path.dirname(index_path)
 
-    def get_path(self, relative_url, parent_relative_url=None):
+    def __call__(self, relative_url, parent_relative_url=None):
         if parent_relative_url is None:
             # This means we're dealing with a root dependency with no parent.
             # Assume the relative_url is already resolved.
@@ -183,9 +179,15 @@ class PathResolver(object):
         return (normalized_relative_url,
                 os.path.join(self.root_dir, relative_path))
 
+
+class Importer(object):
+
+    def __init__(self, resolve):
+        self.resolve = resolve
+
     def __call__(self, parent_relative_url, el):
         if el.tag == 'script':
-            return self.resolve_script(parent_relative_url, el)
+            result = self.import_script(parent_relative_url, el)
         elif el.tag == 'link':
             rel = el.attrib.get('rel')
             href = el.attrib.get('href')
@@ -194,23 +196,24 @@ class PathResolver(object):
                      href.startswith('https://') or
                      href.startswith('/'))):
                 # Locally resolve any imports that aren't absolute paths.
-                return self.resolve_html(
+                result = self.import_html(
                     href, parent_relative_url=parent_relative_url)
             else:
-                return self.resolve_link(parent_relative_url, el)
+                result = self.import_link(parent_relative_url, el)
         else:
             assert False
 
-    def resolve_html(self, relative_url, parent_relative_url=None):
-        relative_url, path = self.get_path(
+        result.parse()
+        return result
+
+    def import_html(self, relative_url, parent_relative_url=None):
+        relative_url, path = self.resolve(
             relative_url, parent_relative_url=parent_relative_url)
         logging.debug('Dependency %r of %r has file path %r',
                       relative_url, parent_relative_url, path)
-        imported_file = ImportedHtml(relative_url, path)
-        imported_file.parse()
-        return imported_file
+        return ImportedHtml(relative_url, path)
 
-    def resolve_script(self, parent_relative_url, script_el):
+    def import_script(self, parent_relative_url, script_el):
         try:
             script_type = script_el.attrib['type']
         except KeyError:
@@ -223,157 +226,22 @@ class PathResolver(object):
             script_src = script_el.attrib['src']
         except KeyError:
             # The script is inline.
-            imported_script = ImportedScript(script_el, text=script_el.text)
-            imported_script.parse()
-            return imported_script
+            return ImportedScript(script_el, text=script_el.text)
         else:
             # The script is an external resource so we shouldn't vulcanize.
             # TODO: Consider doing this in the future.
-            relative_url, _ = self.get_path(
+            relative_url, _ = self.resolve(
                 script_src, parent_relative_url=parent_relative_url)
             return ImportedScript(script_el, relative_url=relative_url)
 
-    def resolve_link(self, parent_relative_url, link_el):
+    def import_link(self, parent_relative_url, link_el):
         try:
             rel = link_el.attrib['rel']
             href = link_el.attrib['href']
         except KeyError:
             raise InvalidLinkError(html.tostring(link_el))
 
-        relative_url, _ = self.get_path(
+        relative_url, _ = self.resolve(
             href, parent_relative_url=parent_relative_url)
 
-        imported_link = ImportedLink(relative_url, link_el)
-        imported_link.parse()
-        return imported_link
-
-
-class FileIndex(object):
-
-    def __init__(self):
-        self.index = {}
-
-    def add(self, relative_url, path):
-        assert relative_url
-        if relative_url in self.index:
-            logging.debug('Already seen %r', relative_url)
-            return False
-        self.index[relative_url] = path
-        logging.debug('New dependency %r', relative_url)
-        return True
-
-    def get_source_line(self, relative_url, line_number):
-        path = self.index[relative_url]
-        open(path).read()
-
-
-def traverse(node, resolve, file_index):
-    """
-    Breadth-first search. Order of returned nodes matters because
-    that's dependency order.
-    """
-    # After going depth-first on the resources, figure out which of
-    # the script tags and link tags we need to track for this node.
-    # We'll ignore anything here that was already included in a dependency
-    # deeper in the graph.
-    for el in node.resource_tags:
-        try:
-            imported = resolve(node.relative_url, el)
-        except InvalidScriptError as e:
-            logging.debug('Ignoring invalid script: %r', str(e))
-            continue
-        except InvalidLinkError as e:
-            logging.debug('Ignoring invalid link: %r', str(e))
-            continue
-
-        if (imported.relative_url is not None and
-                not file_index.add(imported.relative_url, imported.path)):
-            # Resource already included.
-            continue
-
-        node.dependencies.append(imported)
-
-        if imported.resource_tags:
-            traverse(imported, resolve, file_index)
-
-
-def generate_dependencies(node):
-    for dep in node.dependencies:
-        for value in generate_dependencies(dep):
-            yield value
-    yield node
-
-
-def assemble(root_file):
-    root_el = html.Element('html')
-
-    head_el = html.Element('head')
-    root_el.append(head_el)
-
-    for tag in root_file.head_tags:
-        copied = deepcopy(tag)
-        head_el.append(copied)
-
-    body_el = html.Element('body')
-    root_el.append(body_el)
-
-    hidden_el = html.Element('div', attrib={'hidden': 'hidden'})
-    body_el.append(hidden_el)
-
-    for tag in root_file.body_tags:
-        copied = deepcopy(tag)
-        body_el.append(copied)
-
-    combined_script = StringIO()
-
-    for tag in generate_dependencies(root_file):
-        logging.debug('Generating %r', tag)
-        if isinstance(tag, ImportedLink):
-            # External link that can't be vulcanized.
-            copied = deepcopy(tag.el)
-            head_el.append(copied)
-        elif isinstance(tag, ImportedScript):
-            if tag.text:
-                if tag.relative_url:
-                    combined_script.write('\n// %s\n' % tag.relative_url)
-                combined_script.write(tag.text)
-                combined_script.write('\n;\n')
-            else:
-                # External link that can't be vulcanized.
-                copied = deepcopy(tag.el)
-                # Override the script tag's include URL to be relative to
-                # the index file.
-                logging.debug('Adding script src %r', html.tostring(tag.el))
-                copied.attrib['src'] = tag.relative_url
-                head_el.append(copied)
-        elif isinstance(tag, ImportedHtml):
-            for child_tag in tag.polymer_tags:
-                copied = deepcopy(child_tag)
-                # Remove any child script and link tags from Polymer elements
-                # because these will already exist in the vulcanized file or
-                # head.
-                for el in copied.findall('script'):
-                    copied.remove(el)
-                for el in copied.findall('link'):
-                    copied.remove(el)
-                hidden_el.append(copied)
-
-    # TODO: Split this into a separate file that can have a sourcemap.
-    combined_el = html.Element('script', attrib={'type': 'text/javascript'})
-    combined_el.text = combined_script.getvalue().decode('utf-8')
-    body_el.append(combined_el)
-
-    return root_el
-
-
-logging.getLogger().setLevel(logging.DEBUG)
-
-resolver = PathResolver('', './')
-root_file = resolver.resolve_html('index.html')
-file_index = FileIndex()
-traverse(root_file, resolver, file_index)
-root_el = assemble(root_file)
-
-print html.tostring(root_el, doctype='<!doctype html>')
-
-# import pdb; pdb.set_trace()
+        return ImportedLink(relative_url, link_el)
