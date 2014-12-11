@@ -73,6 +73,27 @@ class Traverser(object):
         yield node
 
 
+def remove_node(el):
+    """
+    Clear any funky tail text that may be after certain html elements
+    like <link> with no closing </link> tag.
+    """
+    parent = el.getparent()
+    if not el.tail:
+        parent.remove(el)
+        return
+
+    siblings = list(el.itersiblings(preceding=True))
+    if len(siblings) > 0:
+        siblings[0].tail += el.tail
+        el.tail = ''
+    else:
+        parent.text += el.tail
+
+    el.tail = ''
+    parent.remove(el)
+
+
 def assemble(root_file, traverse):
     root_el = html.Element('html')
 
@@ -101,6 +122,7 @@ def assemble(root_file, traverse):
         if isinstance(tag, importer.ImportedLink):
             # External link that can't be vulcanized.
             copied = deepcopy(tag.el)
+            copied.tail = ''
             head_el.append(copied)
         elif isinstance(tag, importer.ImportedScript):
             if tag.text:
@@ -115,17 +137,20 @@ def assemble(root_file, traverse):
                 # the index file.
                 logging.debug('Adding script src %r', html.tostring(tag.el))
                 copied.attrib['src'] = tag.relative_url
+                copied.tail = ''
                 head_el.append(copied)
         elif isinstance(tag, importer.ImportedHtml):
             for child_tag in tag.polymer_tags:
                 copied = deepcopy(child_tag)
+
                 # Remove any child script and link tags from Polymer elements
                 # because these will already exist in the vulcanized file or
                 # head.
-                for el in copied.findall('script'):
-                    copied.remove(el)
-                for el in copied.findall('link'):
-                    copied.remove(el)
+                for el in copied.findall('.//script'):
+                    remove_node(el)
+                for el in copied.findall('.//link'):
+                    remove_node(el)
+
                 hidden_el.append(copied)
 
     # TODO: Split this into a separate file that can have a sourcemap.

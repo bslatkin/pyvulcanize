@@ -145,9 +145,7 @@ class ImportedLink(ImportedFile):
         super(ImportedLink, self).__init__(relative_url, path=None, el=link_el)
 
     def parse(self):
-        # Clear any funky tail text that may be after certain html elements
-        # like <link> with no closing </link> tag.
-        self.el.tail = ''
+        pass
 
 
 class PathResolver(object):
