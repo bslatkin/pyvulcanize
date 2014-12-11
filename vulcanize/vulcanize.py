@@ -91,15 +91,11 @@ class ImportedHtml(ImportedFile):
 
 class ImportedScript(ImportedFile):
 
-    def __init__(self, script_el, text=None, relative_url=None, path=None):
-        super(ImportedScript, self).__init__(relative_url, path, script_el)
+    def __init__(self, script_el, text=None, relative_url=None):
+        super(ImportedScript, self).__init__(relative_url, None, script_el)
         self.text = text
 
     def parse(self):
-        if self.path:
-            with open(self.path) as handle:
-                self.text = handle.read()
-
         if self.text:
             # Escape any </script> close tags because those will break the
             # parser. Notably, CDATA is ignored with HTML5 parsing rules, so
@@ -139,8 +135,8 @@ class ImportedScript(ImportedFile):
             before, name, middle, closing, after)
 
     def __repr__(self):
-        if self.path:
-            return 'ImportedScript(path=%r)' % self.path
+        if self.relative_url:
+            return 'ImportedScript(relative_url=%r)' % self.relative_url
         elif self.text:
             return 'ImportedScript(%r)' % self.text
         else:
@@ -231,22 +227,11 @@ class PathResolver(object):
             imported_script.parse()
             return imported_script
         else:
-            if (script_src.startswith('http://') or
-                script_src.startswith('https://')):
-                # The script is an external resource we can't vulcanize.
-                return ImportedScript(script_el)
-            else:
-                # The script is a local resource we should vulcanize.
-                logging.debug('Found script %r in %r',
-                              script_src, parent_relative_url)
-                relative_url, path = self.get_path(
-                    script_src, parent_relative_url=parent_relative_url)
-                logging.debug('Script %r from %r has file path %r',
-                              relative_url, parent_relative_url, path)
-                imported_script = ImportedScript(
-                    script_el, relative_url=relative_url, path=path)
-                imported_script.parse()
-                return imported_script
+            # The script is an external resource so we shouldn't vulcanize.
+            # TODO: Consider doing this in the future.
+            relative_url, _ = self.get_path(
+                script_src, parent_relative_url=parent_relative_url)
+            return ImportedScript(script_el, relative_url=relative_url)
 
     def resolve_link(self, parent_relative_url, link_el):
         try:
@@ -356,6 +341,10 @@ def assemble(root_file):
             else:
                 # External link that can't be vulcanized.
                 copied = deepcopy(tag.el)
+                # Override the script tag's include URL to be relative to
+                # the index file.
+                logging.debug('Adding script src %r', html.tostring(tag.el))
+                copied.attrib['src'] = tag.relative_url
                 head_el.append(copied)
         elif isinstance(tag, ImportedHtml):
             for child_tag in tag.polymer_tags:
