@@ -113,6 +113,12 @@ class ImportedScript(ImportedFile):
         self.text = text
 
     def parse(self):
+        # Escape any </script> close tags because those will break the parser.
+        # Notably, CDATA is ignored with HTML5 parsing rules, so that
+        # can't help.
+        self.text = self.text.replace('</script>', '<\/script>')
+
+        # Determine if we need to rewrite a Polymer() constructor.
         parent = self.el.xpath('ancestor::polymer-element')
         if not parent:
             return
@@ -128,7 +134,6 @@ class ImportedScript(ImportedFile):
             return
 
         has_name, found_name, closing = match.groups()
-        logging.info('Groups are: %r', match.groups())
         if has_name:
             assert found_name == name
             return
@@ -262,7 +267,7 @@ class FileIndex(object):
         open(path).read()
 
 
-def traverse(node, resolver, file_index):
+def traverse(node, resolver, file_index, root=True):
     """
     Breadth-first search. Order of returned nodes matters because
     that's dependency order.
@@ -270,14 +275,17 @@ def traverse(node, resolver, file_index):
     if not file_index.add(node.relative_url, node.path):
         return []
 
-    all_nodes = []
+    dependencies = []
 
     for relative_url in node.dependencies:
         dep = resolver.resolve_html(
             relative_url, parent_relative_url=node.relative_url)
-        all_nodes.extend(traverse(dep, resolver, file_index))
+        dependencies.extend(traverse(dep, resolver, file_index, root=False))
 
-    return all_nodes + [node]
+    if not root:
+        dependencies.append(node)
+
+    return dependencies
 
 
 MergedDependencies = namedtuple(
@@ -285,7 +293,7 @@ MergedDependencies = namedtuple(
     ['head_tags', 'polymer_tags', 'script_tags', 'link_tags'])
 
 
-def merge_nodes(all_nodes, file_index, resolver):
+def merge_nodes(dependent_nodes, file_index, resolver):
     """
     Order of returned values matters because that's in dependency order
     based on the supplied nodes.
@@ -295,7 +303,7 @@ def merge_nodes(all_nodes, file_index, resolver):
     script_tags = []
     link_tags = []
 
-    for dep_node in all_nodes:
+    for dep_node in dependent_nodes:
         head_tags.extend(dep_node.head_tags)
         polymer_tags.extend(dep_node.polymer_tags)
 
@@ -375,10 +383,13 @@ def assemble(root_file, merged):
         copied = deepcopy(tag)
         body_el.append(copied)
 
-    # TODO: Split this into a separate file that can have a sourcemap.
     combined_script = StringIO()
 
-    for tag in merged.script_tags:
+    # Tags directly in the root file should be included first in the
+    # order they were found.
+    all_script_tags = root_file.script_tags + merged.script_tags
+
+    for tag in all_script_tags:
         if tag.text:
             combined_script.write(tag.text)
             combined_script.write('\n;\n')
@@ -392,13 +403,9 @@ def assemble(root_file, merged):
             copied = deepcopy(tag.el)
             head_el.append(copied)
 
-    script_source = combined_script.getvalue()
-    # Escape any </script> close tags because those will break the parser.
-    # Notably, CDATA is ignored with HTML5 parsing rules, so that can't help.
-    script_source = script_source.replace('</script>', '<\/script>')
-
+    # TODO: Split this into a separate file that can have a sourcemap.
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
-    combined_el.text = script_source.decode('utf-8')
+    combined_el.text = combined_script.getvalue().decode('utf-8')
     body_el.append(combined_el)
 
     return root_el
@@ -409,8 +416,8 @@ logging.getLogger().setLevel(logging.DEBUG)
 resolver = PathResolver('', './')
 root_file = resolver.resolve_html('index.html')
 file_index = FileIndex()
-all_nodes = traverse(root_file, resolver, file_index)
-merged = merge_nodes(all_nodes, file_index, resolver)
+dependent_nodes = traverse(root_file, resolver, file_index)
+merged = merge_nodes(dependent_nodes, file_index, resolver)
 root_el = assemble(root_file, merged)
 
 print html.tostring(root_el, doctype='<!doctype html>')
