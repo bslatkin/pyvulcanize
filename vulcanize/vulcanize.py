@@ -16,11 +16,11 @@
 
 from collections import deque, namedtuple
 from copy import deepcopy
+from cStringIO import StringIO
 import logging
 from lxml import html
 import os.path
-from cStringIO import StringIO
-
+import re
 
 class Error(Exception):
     pass
@@ -110,6 +110,18 @@ class ImportedScript(ImportedFile):
     def __init__(self, script_el, text=None, relative_url=None, path=None):
         super(ImportedScript, self).__init__(relative_url, path, script_el)
         self.text = text
+
+    def parse(self):
+        parent = el.xpath('ancestor::polymer-element')
+        if not parent:
+            return
+        assert len(parent) == 1
+        parent = parent[0]
+
+        name = parent.attrib['name']
+        re.match('')
+        self.text
+
 
     def __repr__(self):
         if self.path:
@@ -343,6 +355,10 @@ def assemble(root_file, merged):
 
     for tag in merged.script_tags:
         if tag.text:
+            if tag.el.xpath('ancestor::polymer-element'):
+
+            if 'Polymer(' in tag.text:
+                import pdb; pdb.set_trace()
             combined_script.write(tag.text)
             combined_script.write('\n;\n')
         elif tag.path:
@@ -369,7 +385,7 @@ def assemble(root_file, merged):
 
 logging.getLogger().setLevel(logging.DEBUG)
 
-resolver = PathResolver('', './example/')
+resolver = PathResolver('', './')
 root_file = resolver.resolve_html('index.html')
 file_index = FileIndex()
 all_nodes = traverse(root_file, resolver, file_index)
