@@ -34,13 +34,8 @@ class InvalidLinkError(Error):
     pass
 
 
-# TODO: assert we have relative URLs everywhere, not absolute
-# TODO: Don't manipulate the original etrees because we want to be able to
-# generate sourcemaps that point back to the original script locations.
-# TODO: Explicitly import style and link tags from children, ignore everything
-# else. Only preserve other head tags from the root file.
 # TODO: Handle no-script Polymer elements that don't explicitly call Polymer()
-
+# TODO: Rewrite Polymer() constructor calls.
 
 class ImportedFile(object):
 

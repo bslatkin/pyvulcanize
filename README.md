@@ -64,3 +64,11 @@ Then install all of the requirements for the Python part of the project:
 ```
 pip install -r ./requirements.txt
 ```
+
+#### Reproducing the existing output
+
+In the example directory use the vulcanize tool (`npm install vulcanize`) to generate the expected output. Note you need to use the "content security policy" flag to have it generate an external JS file.
+
+```
+ ./node_modules/vulcanize/bin/vulcanize --csp -o official_test.html ./index.html
+```
