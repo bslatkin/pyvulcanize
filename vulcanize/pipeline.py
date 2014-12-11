@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from lxml import html
+import os
 
 from . import assembler
 from . import importer
@@ -23,7 +24,8 @@ from . import importer
 __all__ = ['vulcanize']
 
 
-def vulcanize(index_relative_url, index_path):
+def vulcanize(index_path):
+    index_relative_url = os.path.basename(index_path)
     resolver = importer.PathResolver(index_relative_url, index_path)
     import_tag = importer.Importer(resolver)
     root_file = import_tag.import_html(index_relative_url)

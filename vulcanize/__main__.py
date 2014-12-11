@@ -14,15 +14,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""TODO"""
+
+import argparse
 import logging
 
 from . pipeline import vulcanize
 
 
+class Flags(object):
+
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(
+            description=__doc__,
+            prog='vulcanize')
+        self.parser.add_argument(
+            '-v', '--verbose',
+            help='Do verbose logging.',
+            action='store_true',
+            default=False)
+        self.parser.add_argument(
+            '-o', '--output',
+            help='Write output to the given path instead of stdout.',
+            action='store',
+            default=None)
+        self.parser.add_argument(
+            'index_path',
+            help='Path to the index file to vulcanize.',
+            type=str,
+            action='store',
+            default=None)
+
+    def parse(self):
+        self.parser.parse_args(namespace=self)
+        if not self.index_path:
+            self.parser.error('index_path required')
+
+
+FLAGS = Flags()
+
+
 def main():
-    logging.getLogger().setLevel(logging.DEBUG)
-    result = vulcanize('index.html', './example/index.html')
-    print result
+    FLAGS.parse()
+
+    if FLAGS.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    result = vulcanize(FLAGS.index_path)
+
+    if FLAGS.output:
+        with open(FLAGS.output, 'wb') as handle:
+            handle.write(result)
+    else:
+        print result
 
 
 if __name__ == '__main__':
