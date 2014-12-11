@@ -18,8 +18,10 @@
 
 import argparse
 import logging
+import sys
 
 from . pipeline import vulcanize
+from . server import run_server
 
 
 class Flags(object):
@@ -38,6 +40,18 @@ class Flags(object):
             help='Write output to the given path instead of stdout.',
             action='store',
             default=None)
+        self.parser.add_argument(
+            '-a', '--host',
+            help='Run a vulcanizing server on the given hostname.',
+            action='store',
+            type=str,
+            default='')
+        self.parser.add_argument(
+            '-p', '--port',
+            help='Run a vulcanizing server on the given port.',
+            action='store',
+            type=int,
+            default=0)
         self.parser.add_argument(
             'index_path',
             help='Path to the index file to vulcanize.',
@@ -60,6 +74,10 @@ def main():
     if FLAGS.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    if FLAGS.port:
+        run_server(FLAGS.host, FLAGS.port, FLAGS.index_path)
+        return 0
+
     result = vulcanize(FLAGS.index_path)
 
     if FLAGS.output:
@@ -68,6 +86,8 @@ def main():
     else:
         print result
 
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
