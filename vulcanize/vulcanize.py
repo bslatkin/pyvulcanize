@@ -22,6 +22,7 @@ from lxml import html
 import os.path
 import re
 
+
 class Error(Exception):
     pass
 
@@ -112,16 +113,37 @@ class ImportedScript(ImportedFile):
         self.text = text
 
     def parse(self):
-        parent = el.xpath('ancestor::polymer-element')
+        parent = self.el.xpath('ancestor::polymer-element')
         if not parent:
             return
+
         assert len(parent) == 1
         parent = parent[0]
 
         name = parent.attrib['name']
-        re.match('')
-        self.text
+        match = re.search(
+            r'Polymer\(\s*([\'\"]([^\'\"]+)[\'\"]\s*)?\s*([^\)])?',
+            self.text)
+        if not match:
+            return
 
+        has_name, found_name, closing = match.groups()
+        logging.info('Groups are: %r', match.groups())
+        if has_name:
+            assert found_name == name
+            return
+
+        before = self.text[:match.start()]
+        after = self.text[match.end():]
+
+        if closing:
+            middle = ', '
+        else:
+            closing = ''
+            middle = ''
+
+        self.text = "%sPolymer('%s'%s%s%s" % (
+            before, name, middle, closing, after)
 
     def __repr__(self):
         if self.path:
@@ -172,7 +194,9 @@ class PathResolver(object):
             relative_url, parent_relative_url=parent_relative_url)
         logging.debug('Dependency %r of %r has file path %r',
                       relative_url, parent_relative_url, path)
-        return ImportedHtml(relative_url, path)
+        imported_file = ImportedHtml(relative_url, path)
+        imported_file.parse()
+        return imported_file
 
     def resolve_script(self, parent_relative_url, script_el):
         try:
@@ -187,7 +211,9 @@ class PathResolver(object):
             script_src = script_el.attrib['src']
         except KeyError:
             # The script is inline.
-            return ImportedScript(script_el, text=script_el.text)
+            tag = ImportedScript(script_el, text=script_el.text)
+            tag.parse()
+            return tag
         else:
             if (script_src.startswith('http://') or
                 script_src.startswith('https://')):
@@ -241,7 +267,6 @@ def traverse(node, resolver, file_index):
     Breadth-first search. Order of returned nodes matters because
     that's dependency order.
     """
-    node.parse()
     if not file_index.add(node.relative_url, node.path):
         return []
 
@@ -355,10 +380,6 @@ def assemble(root_file, merged):
 
     for tag in merged.script_tags:
         if tag.text:
-            if tag.el.xpath('ancestor::polymer-element'):
-
-            if 'Polymer(' in tag.text:
-                import pdb; pdb.set_trace()
             combined_script.write(tag.text)
             combined_script.write('\n;\n')
         elif tag.path:
