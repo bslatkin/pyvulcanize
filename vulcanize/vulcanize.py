@@ -39,6 +39,7 @@ class InvalidLinkError(Error):
 # generate sourcemaps that point back to the original script locations.
 # TODO: Explicitly import style and link tags from children, ignore everything
 # else. Only preserve other head tags from the root file.
+# TODO: Handle no-script Polymer elements that don't explicitly call Polymer()
 
 
 class ImportedFile(object):
@@ -217,10 +218,10 @@ class FileIndex(object):
     def add(self, relative_url, path):
         assert relative_url
         if relative_url in self.index:
-            logging.debug('Already seen %r', path)
+            logging.debug('Already seen %r', relative_url)
             return False
         self.index[relative_url] = path
-        logging.debug('New file %r', path)
+        logging.debug('New dependency %r', relative_url)
         return True
 
     def get_source_line(self, relative_url, line_number):
@@ -365,8 +366,13 @@ def assemble(root_file, merged):
             copied = deepcopy(tag.el)
             head_el.append(copied)
 
+    script_source = combined_script.getvalue()
+    # Escape any </script> close tags because those will break the parser.
+    # Notably, CDATA is ignored with HTML5 parsing rules, so that can't help.
+    script_source = script_source.replace('</script>', '<\/script>')
+
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
-    combined_el.text = combined_script.getvalue().decode('utf-8')
+    combined_el.text = script_source.decode('utf-8')
     body_el.append(combined_el)
 
     return root_el
