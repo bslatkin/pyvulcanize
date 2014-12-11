@@ -155,8 +155,22 @@ class ImportedScript(ImportedTag):
 
 class ImportedLink(ImportedTag):
 
-    def __init__(self, relative_url, link_el):
-        super(ImportedLink, self).__init__(relative_url, path=None, el=link_el)
+    def __init__(self, relative_url, link_el, path=None):
+        super(ImportedLink, self).__init__(
+            relative_url, path=path, el=link_el)
+        self.replacement = None
+
+    def parse(self):
+        if not self.path:
+            return
+
+        if self.el.attrib.get('rel') != 'stylesheet':
+            return
+
+        self.replacement = html.Element('style', attrib={'type': 'text/css'})
+
+        with open(self.path) as handle:
+            self.replacement.text = handle.read()
 
 
 class ImportedPolymerElement(ImportedTag):
@@ -183,6 +197,11 @@ class PathResolver(object):
         self.root_dir = os.path.dirname(index_path)
 
     def __call__(self, relative_url, parent_relative_url=None):
+        if (relative_url.startswith('http://') or
+                relative_url.startswith('https://') or
+                relative_url.startswith('/')):
+            return relative_url, None
+
         if parent_relative_url is None:
             # This means we're dealing with a root dependency with no parent.
             # Assume the relative_url is already resolved.
@@ -267,10 +286,10 @@ class Importer(object):
         except KeyError:
             raise InvalidLinkError(html.tostring(link_el))
 
-        relative_url, _ = self.resolve(
+        relative_url, path = self.resolve(
             href, parent_relative_url=parent_relative_url)
 
-        return ImportedLink(relative_url, link_el)
+        return ImportedLink(relative_url, link_el, path=path)
 
     def import_polymer_element(self, parent_relative_url, polymer_el):
         return ImportedPolymerElement(polymer_el)

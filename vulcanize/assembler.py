@@ -87,8 +87,10 @@ def remove_node(el):
 
     siblings = list(el.itersiblings(preceding=True))
     if len(siblings) > 0:
-        siblings[0].tail += el.tail
-        el.tail = ''
+        before = siblings[0]
+        if not before.tail:
+            before.tail = ''
+        before.tail += el.tail
     else:
         if not parent.text:
             parent.text = ''
@@ -124,10 +126,14 @@ def assemble(root_file, traverse):
         logging.debug('Traversing %r', tag)
 
         if isinstance(tag, importer.ImportedLink):
-            # External link that can't be vulcanized.
-            copied = copy_clean(tag.el)
-            remove_node(tag.el)
-            head_el.append(copied)
+            if tag.replacement is not None:
+                tag.el.addprevious(tag.replacement)
+                remove_node(tag.el)
+            else:
+                # External link that can't be vulcanized.
+                copied = copy_clean(tag.el)
+                remove_node(tag.el)
+                head_el.append(copied)
         elif isinstance(tag, importer.ImportedScript):
             if tag.text:
                 remove_node(tag.el)
