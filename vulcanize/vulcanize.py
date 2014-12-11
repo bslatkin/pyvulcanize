@@ -113,11 +113,6 @@ class ImportedScript(ImportedFile):
         self.text = text
 
     def parse(self):
-        # Escape any </script> close tags because those will break the parser.
-        # Notably, CDATA is ignored with HTML5 parsing rules, so that
-        # can't help.
-        self.text = self.text.replace('</script>', '<\/script>')
-
         # Determine if we need to rewrite a Polymer() constructor.
         parent = self.el.xpath('ancestor::polymer-element')
         if not parent:
@@ -163,6 +158,11 @@ class ImportedLink(ImportedFile):
 
     def __init__(self, relative_url, link_el):
         super(ImportedLink, self).__init__(relative_url, path=None, el=link_el)
+
+    def parse(self):
+        # Clear any funky tail text that may be after certain html elements
+        # like <link> with no closing </link> tag.
+        self.el.tail = ''
 
 
 class PathResolver(object):
@@ -245,7 +245,9 @@ class PathResolver(object):
         relative_url, _ = self.get_path(
             href, parent_relative_url=parent_relative_url)
 
-        return ImportedLink(relative_url, link_el)
+        imported_link = ImportedLink(relative_url, link_el)
+        imported_link.parse()
+        return imported_link
 
 
 class FileIndex(object):
@@ -280,7 +282,44 @@ def traverse(node, resolver, file_index, root=True):
     for relative_url in node.dependencies:
         dep = resolver.resolve_html(
             relative_url, parent_relative_url=node.relative_url)
+
         dependencies.extend(traverse(dep, resolver, file_index, root=False))
+
+    # After going depth-first on the resources, figure out which of
+    # the script tags and link tags we need to track for this node.
+    # We'll ignore anything here that was already included in a dependency
+    # deeper in the graph.
+    script_tags = []
+    for el in node.script_tags:
+        try:
+            script = resolver.resolve_script(node.relative_url, el)
+        except InvalidScriptError as e:
+            logging.debug('Ignoring invalid script: %r', str(e))
+            continue
+
+        if script.text:
+            # Keep all inline scripts.
+            script_tags.append(script)
+        elif (script.relative_url and
+              file_index.add(script.relative_url, script.path)):
+            # Keep external scripts that haven't been seen yet.
+            script_tags.append(script)
+
+    link_tags = []
+    for el in node.link_tags:
+        try:
+            link = resolver.resolve_link(node.relative_url, el)
+        except InvalidLinkError as e:
+            logging.debug('Ignoring invalid link: %r', str(e))
+            continue
+
+        # Keep external links that haven't been seen yet.
+        if (link.relative_url and
+                file_index.add(link.relative_url, link.path)):
+            link_tags.append(link)
+
+    node.script_tags = script_tags
+    node.link_tags = link_tags
 
     if not root:
         dependencies.append(node)
@@ -293,7 +332,7 @@ MergedDependencies = namedtuple(
     ['head_tags', 'polymer_tags', 'script_tags', 'link_tags'])
 
 
-def merge_nodes(dependent_nodes, file_index, resolver):
+def merge_nodes(dependent_nodes):
     """
     Order of returned values matters because that's in dependency order
     based on the supplied nodes.
@@ -303,47 +342,17 @@ def merge_nodes(dependent_nodes, file_index, resolver):
     script_tags = []
     link_tags = []
 
-    for dep_node in dependent_nodes:
-        head_tags.extend(dep_node.head_tags)
-        polymer_tags.extend(dep_node.polymer_tags)
-
-        for el in dep_node.script_tags:
-            try:
-                script = resolver.resolve_script(dep_node.relative_url, el)
-            except InvalidScriptError as e:
-                logging.debug('Ignoring invalid script: %r', str(e))
-                continue
-
-            if (script.relative_url is not None and
-                    not file_index.add(script.relative_url, script.path)):
-                continue
-            script_tags.append(script)
-
-        for el in dep_node.link_tags:
-            try:
-                link = resolver.resolve_link(dep_node.relative_url, el)
-            except InvalidLinkError as e:
-                logging.debug('Ignoring invalid link: %r', str(e))
-                continue
-
-            if (link.relative_url is not None and
-                    not file_index.add(link.relative_url, link.path)):
-                continue
-            link_tags.append(link)
+    for dep in dependent_nodes:
+        head_tags.extend(dep.head_tags)
+        polymer_tags.extend(dep.polymer_tags)
+        script_tags.extend(dep.script_tags)
+        link_tags.extend(dep.link_tags)
 
     return MergedDependencies(
         head_tags=head_tags,
         polymer_tags=polymer_tags,
         script_tags=script_tags,
         link_tags=link_tags)
-
-
-def assemble_scripts(merged):
-    output = StringIO()
-    for tag in merged.script_tags:
-        output.write(tag.text)
-        output.write(';\n')
-    return output.getvalue()
 
 
 def assemble(root_file, merged):
@@ -358,9 +367,6 @@ def assemble(root_file, merged):
 
     for tag in merged.link_tags:
         copied = deepcopy(tag.el)
-        # Clear any funky tail text that may be after certain html elements
-        # like <link> with no closing </link> tag.
-        copied.tail = ''
         head_el.append(copied)
 
     body_el = html.Element('body')
@@ -403,9 +409,15 @@ def assemble(root_file, merged):
             copied = deepcopy(tag.el)
             head_el.append(copied)
 
+    # Escape any </script> close tags because those will break the parser.
+    # Notably, CDATA is ignored with HTML5 parsing rules, so that
+    # can't help.
+    script_source = combined_script.getvalue()
+    script_source = script_source.replace('</script>', '<\/script>')
+
     # TODO: Split this into a separate file that can have a sourcemap.
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
-    combined_el.text = combined_script.getvalue().decode('utf-8')
+    combined_el.text = script_source.decode('utf-8')
     body_el.append(combined_el)
 
     return root_el
@@ -417,7 +429,7 @@ resolver = PathResolver('', './')
 root_file = resolver.resolve_html('index.html')
 file_index = FileIndex()
 dependent_nodes = traverse(root_file, resolver, file_index)
-merged = merge_nodes(dependent_nodes, file_index, resolver)
+merged = merge_nodes(dependent_nodes)
 root_el = assemble(root_file, merged)
 
 print html.tostring(root_el, doctype='<!doctype html>')
