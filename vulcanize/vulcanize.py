@@ -18,7 +18,7 @@ from collections import deque, namedtuple
 from copy import deepcopy
 import logging
 from lxml import html
-from lxml.html import soupparser as html5parser
+from lxml.html import html5parser
 import os.path
 
 
