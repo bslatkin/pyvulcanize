@@ -35,7 +35,7 @@ class InvalidLinkError(Error):
     pass
 
 
-class ImportedFile(object):
+class ImportedTag(object):
 
     def __init__(self, relative_url, path, el):
         self.relative_url = relative_url
@@ -43,17 +43,19 @@ class ImportedFile(object):
         self.el = el
         self.resource_tags = []
 
+    def parse(self):
+        pass
+
     def __repr__(self):
-        return '%s(relative_url=%r, path=%r)' % (
-            self.__class__.__name__, self.relative_url, self.path)
+        return '%s(relative_url=%r, path=%r, el=%r)' % (
+            self.__class__.__name__, self.relative_url, self.path, self.el)
 
 
-class ImportedHtml(ImportedFile):
+class ImportedHtml(ImportedTag):
 
     def __init__(self, relative_url, path):
         super(ImportedHtml, self).__init__(relative_url, path, None)
         self.head_tags = []
-        self.polymer_tags = []
         self.body_tags = []
 
     def parse(self):
@@ -65,12 +67,17 @@ class ImportedHtml(ImportedFile):
         for el in self.el.findall('//*'):
             if el.tag not in ('script', 'link'):
                 continue
+            if el.xpath('ancestor::polymer-element'):
+                # Ignore scripts and links that appear within a polymer
+                # element tag. Those will be handled by ImportedPolymerElement.
+                continue
             if el not in seen_tags:
                 seen_tags.add(el)
                 self.resource_tags.append(el)
 
-        self.polymer_tags = self.el.findall('//polymer-element')
-        seen_tags.update(self.polymer_tags)
+        for el in self.el.findall('//polymer-element'):
+            seen_tags.add(el)
+            self.resource_tags.append(el)
 
         # Save everything from head and body that aren't tags we've
         # already seen through the xpath queries above.
@@ -85,7 +92,7 @@ class ImportedHtml(ImportedFile):
                 self.body_tags.append(el)
 
 
-class ImportedScript(ImportedFile):
+class ImportedScript(ImportedTag):
 
     def __init__(self, script_el, text=None, relative_url=None):
         super(ImportedScript, self).__init__(relative_url, None, script_el)
@@ -98,6 +105,13 @@ class ImportedScript(ImportedFile):
             # that can't help.
             self.text = self.text.replace('</script>', '<\/script>')
 
+        self.rewrite_name()
+
+        # Rewrite relative URLs to be relative to the index file.
+        if self.relative_url:
+            self.el.attrib['src'] = self.relative_url
+
+    def rewrite_name(self):
         # Determine if we need to rewrite a Polymer() constructor.
         parent = self.el.xpath('ancestor::polymer-element')
         if not parent:
@@ -139,13 +153,25 @@ class ImportedScript(ImportedFile):
             assert False, 'Bad ImportedScript'
 
 
-class ImportedLink(ImportedFile):
+class ImportedLink(ImportedTag):
 
     def __init__(self, relative_url, link_el):
         super(ImportedLink, self).__init__(relative_url, path=None, el=link_el)
 
+
+class ImportedPolymerElement(ImportedTag):
+
+    def __init__(self, polymer_el):
+        super(ImportedPolymerElement, self).__init__(
+            relative_url=None, path=None, el=polymer_el)
+
     def parse(self):
-        pass
+        # TODO: If this is a stylesheet inline, we need to put it
+        # back inside the <template> element.
+        for child_el in self.el.findall('.//*'):
+            if child_el.tag not in ('script', 'link'):
+                continue
+            self.resource_tags.append(child_el)
 
 
 class PathResolver(object):
@@ -198,6 +224,8 @@ class Importer(object):
                     href, parent_relative_url=parent_relative_url)
             else:
                 result = self.import_link(parent_relative_url, el)
+        elif el.tag == 'polymer-element':
+            result = self.import_polymer_element(parent_relative_url, el)
         else:
             assert False
 
@@ -243,3 +271,6 @@ class Importer(object):
             href, parent_relative_url=parent_relative_url)
 
         return ImportedLink(relative_url, link_el)
+
+    def import_polymer_element(self, parent_relative_url, polymer_el):
+        return ImportedPolymerElement(polymer_el)

@@ -56,10 +56,12 @@ class Traverser(object):
             try:
                 dep = self.import_tag(node.relative_url, el)
             except importer.InvalidScriptError as e:
-                logging.debug('Ignoring invalid script: %r', str(e))
+                logging.debug('Removing invalid script: %r', str(e))
+                remove_node(el)
                 continue
             except importer.InvalidLinkError as e:
-                logging.debug('Ignoring invalid link: %r', str(e))
+                logging.debug('Removing invalid link: %r', str(e))
+                remove_node(el)
                 continue
 
             if (dep.relative_url is not None and
@@ -88,10 +90,20 @@ def remove_node(el):
         siblings[0].tail += el.tail
         el.tail = ''
     else:
+        if not parent.text:
+            parent.text = ''
         parent.text += el.tail
 
     el.tail = ''
     parent.remove(el)
+
+
+def copy_clean(el):
+    copied = deepcopy(el)
+    # Remove any tail text from the copied element since we only
+    # want to move the tag around the document.
+    copied.tail = ''
+    return copied
 
 
 def assemble(root_file, traverse):
@@ -100,19 +112,11 @@ def assemble(root_file, traverse):
     head_el = html.Element('head')
     root_el.append(head_el)
 
-    for tag in root_file.head_tags:
-        copied = deepcopy(tag)
-        head_el.append(copied)
-
     body_el = html.Element('body')
     root_el.append(body_el)
 
     hidden_el = html.Element('div', attrib={'hidden': 'hidden'})
     body_el.append(hidden_el)
-
-    for tag in root_file.body_tags:
-        copied = deepcopy(tag)
-        body_el.append(copied)
 
     combined_script = StringIO()
 
@@ -121,41 +125,42 @@ def assemble(root_file, traverse):
 
         if isinstance(tag, importer.ImportedLink):
             # External link that can't be vulcanized.
-            copied = deepcopy(tag.el)
-            copied.tail = ''
+            copied = copy_clean(tag.el)
+            remove_node(tag.el)
             head_el.append(copied)
         elif isinstance(tag, importer.ImportedScript):
             if tag.text:
+                remove_node(tag.el)
                 if tag.relative_url:
                     combined_script.write('\n// %s\n' % tag.relative_url)
                 combined_script.write(tag.text)
                 combined_script.write('\n;\n')
             else:
                 # External link that can't be vulcanized.
-                copied = deepcopy(tag.el)
-                # Override the script tag's include URL to be relative to
-                # the index file.
-                logging.debug('Adding script src %r', html.tostring(tag.el))
-                copied.attrib['src'] = tag.relative_url
-                copied.tail = ''
+                copied = copy_clean(tag.el)
+                remove_node(tag.el)
                 head_el.append(copied)
-        elif isinstance(tag, importer.ImportedHtml):
-            for child_tag in tag.polymer_tags:
-                copied = deepcopy(child_tag)
+        elif isinstance(tag, importer.ImportedPolymerElement):
+            copied = copy_clean(tag.el)
+            remove_node(tag.el)
+            hidden_el.append(copied)
 
-                # Remove any child script and link tags from Polymer elements
-                # because these will already exist in the vulcanized file or
-                # head.
-                for el in copied.findall('.//script'):
-                    remove_node(el)
-                for el in copied.findall('.//link'):
-                    remove_node(el)
+    # Add the head and body tags in last, after all of the calls to
+    # remove_node above have been able to copy tail text around in the
+    # original documents as necessary. The head tags will go in before
+    # all of the other content that's already in there. The body tags will
+    # go in natural document order.
+    for tag in reversed(root_file.head_tags):
+        head_el.insert(0, tag)
 
-                hidden_el.append(copied)
+    for tag in root_file.body_tags:
+        body_el.append(tag)
 
     # TODO: Split this into a separate file that can have a sourcemap.
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
     combined_el.text = combined_script.getvalue().decode('utf-8')
     body_el.append(combined_el)
+
+
 
     return root_el

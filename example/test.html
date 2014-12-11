@@ -1,6 +1,7 @@
 <!doctype html>
 <html><head><meta charset="UTF-8">
   <title>Vulcanizer Test</title>
+  
   <script src="bower_components/webcomponentsjs/webcomponents.js"></script><link rel="import" href="http://example.com/foo/bar.html"><link rel="import" href="/foo/bar.html"><script src="bower_components/polymer/polymer.js"></script><link rel="stylesheet" href="import-test.css" shim-shadowdom><link rel="stylesheet" href="empty.css"></head><body><div hidden="hidden"><polymer-element name="y-import">
   <template>
     <style>
@@ -11,8 +12,7 @@
     <a href="mailto:azakus@users.noreply.github.com">REPORT A BUG</a>
   </template>
   
-</polymer-element>
-<polymer-element name="x-import">
+</polymer-element><polymer-element name="x-import">
   <template>
   
     [Imported: <content></content>]
@@ -54,16 +54,16 @@
   </template>
   
   
-</polymer-element>
-<polymer-element name="x-foo" attributes="">
+</polymer-element><polymer-element name="x-foo" attributes="">
   
-  </polymer-element>
-  <polymer-element name="x-bar" attributes="">
+  </polymer-element><polymer-element name="x-bar" attributes="">
   
-  </polymer-element>
-  </div><x-import>Hello Import!</x-import>
+  </polymer-element></div><x-import>Hello Import!</x-import>
   <y-import></y-import>
-  <script type="text/javascript">
+  
+  
+  
+<script type="text/javascript">
     Polymer('y-import');
   
 ;
@@ -71,12 +71,12 @@
     Polymer('x-import');
   
 ;
-Polymer('x-foo')
-;
-Polymer('x-bar', {})
-;
 
     console.log('&lt;hi&gt;');
   
+;
+Polymer('x-foo')
+;
+Polymer('x-bar', {})
 ;
 </script></body></html>
