@@ -14,10 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import deque
+from collections import deque, namedtuple
 from copy import deepcopy
 import logging
 from lxml import html
+from lxml.html import soupparser as html5parser
 import os.path
 
 
@@ -29,71 +30,96 @@ class InvalidScriptError(Error):
     pass
 
 
+class InvalidLinkError(Error):
+    pass
+
+
 # TODO: assert we have relative URLs everywhere, not absolute
 # TODO: Don't manipulate the original etrees because we want to be able to
 # generate sourcemaps that point back to the original script locations.
 # TODO: Explicitly import style and link tags from children, ignore everything
 # else. Only preserve other head tags from the root file.
 
-def is_import_element(el):
-    return el.tag == 'link' and el.attrib.get('rel') == 'import'
 
+class ImportedFile(object):
 
-def is_polymer_element(el):
-    return el.tag == 'polymer-element'
-
-
-class ImportedHtml(object):
-
-    def __init__(self, relative_url, path):
+    def __init__(self, relative_url, path, el):
         self.relative_url = relative_url
         self.path = path
-        self.tree = None
-        self.head_tags = []
-        self.polymer_elements = []
-        self.dependencies = []
-
-    def parse(self):
-        self.tree = html.parse(self.path, base_url=self.relative_url)
-
-        for el in self.tree.findall('/head/*'):
-            if not is_import_element(el) and not is_polymer_element(el):
-                self.head_tags.append(el)
-
-        self.polymer_elements = self.tree.findall('//polymer-element')
-
-        import_links = self.tree.findall('//link[@rel="import"]')
-        for el in import_links:
-            href = el.attrib.get('href')
-            if (href.startswith('http://') or
-                    href.startswith('https://') or
-                    href.startswith('/')):
-                continue
-            else:
-                self.dependencies.append(href)
+        self.el = el
 
     def __repr__(self):
-        return 'ImportedHtml(relative_url=%r, path=%r)' % (
-            self.relative_url, self.path)
+        return '%s(relative_url=%r, path=%r)' % (
+            self.__class__.__name__, self.relative_url, self.path)
 
 
-class ImportedScript(object):
+class ImportedHtml(ImportedFile):
+
+    def __init__(self, relative_url, path):
+        super(ImportedHtml, self).__init__(relative_url, path, None)
+        self.dependencies = []
+        self.script_tags = []
+        self.link_tags = []
+        self.polymer_tags = []
+        self.head_tags = []
+
+    def parse(self):
+        self.el = html5parser.parse(self.path)
+
+        seen_tags = set()
+
+        self.script_tags = self.el.findall('//script')
+        seen_tags.update(self.script_tags)
+
+        found_links = self.el.findall('//link')
+        seen_tags.update(found_links)
+
+        for el in found_links:
+            if el.attrib.get('rel') == 'import':
+                href = el.attrib.get('href')
+                if (href.startswith('http://') or
+                        href.startswith('https://') or
+                        href.startswith('/')):
+                    # Let links to absolute URLs pass through to the
+                    # final vulcanized document.
+                    self.link_tags.append(el)
+                else:
+                    # It's fine if there are duplicates in this list.
+                    # They'll get deduped at merge time.
+                    self.dependencies.append(href)
+            else:
+                self.link_tags.append(el)
+
+        self.polymer_tags = self.el.findall('//polymer-element')
+        seen_tags.update(self.polymer_tags)
+
+        # Track everything else from head that isn't a tag we already found.
+        for el in self.el.findall('/head/*'):
+            if el in seen_tags:
+                continue
+            else:
+                self.head_tags.append(el)
+
+
+class ImportedScript(ImportedFile):
 
     def __init__(self, script_el, text=None, relative_url=None, path=None):
-        self.el = script_el
-        self.relative_url = relative_url
-        self.path = path
+        super(ImportedScript, self).__init__(relative_url, path, script_el)
         self.text = text
 
     def __repr__(self):
         if self.path:
-            return '<Contents of %r>' % self.path
+            return 'ImportedScript(path=%r)' % self.path
         elif self.text:
-            return repr(self.text)
-        elif self.el is not None:
-            return html.tostring(self.el)
+            return 'ImportedScript(%r)' % self.text
         else:
             assert False, 'Bad ImportedScript'
+
+
+class ImportedLink(ImportedFile):
+
+    def __init__(self, relative_url, link_el):
+        super(ImportedLink, self).__init__(relative_url, path=None, el=link_el)
 
 
 class PathResolver(object):
@@ -139,7 +165,7 @@ class PathResolver(object):
             pass  # Defaults to JavaScript
         else:
             if script_type.lower() != 'text/javascript':
-                raise InvalidScriptError(script_type)
+                raise InvalidScriptError(html.tostring(script_el))
 
         try:
             script_src = script_el.attrib['src']
@@ -162,6 +188,18 @@ class PathResolver(object):
                 return ImportedScript(
                     script_el, relative_url=relative_url, path=path)
 
+    def resolve_link(self, parent_relative_url, link_el):
+        try:
+            rel = link_el.attrib['rel']
+            href = link_el.attrib['href']
+        except KeyError:
+            raise InvalidLinkError(html.tostring(link_el))
+
+        relative_url, _ = self.get_path(
+            href, parent_relative_url=parent_relative_url)
+
+        return ImportedLink(relative_url, link_el)
+
 
 class FileIndex(object):
 
@@ -170,7 +208,6 @@ class FileIndex(object):
 
     def add(self, relative_url, path):
         assert relative_url
-        assert path
         if relative_url in self.index:
             logging.debug('Already seen %r', path)
             return False
@@ -208,41 +245,54 @@ def traverse(root, resolver):
     return all_nodes, file_index
 
 
+MergedDependencies = namedtuple(
+    'MergedDependencies',
+    ['head_tags', 'polymer_tags', 'script_tags', 'link_tags'])
+
+
 def merge_nodes(all_nodes, file_index, resolver):
     """
     Order of returned values matters because that's in dependency order
     based on the supplied nodes.
     """
     head_tags = []
-    polymer_elements = []
-    scripts = []
+    polymer_tags = []
+    script_tags = []
+    link_tags = []
 
     for dep_node in all_nodes:
-        script_elements = []
+        head_tags.extend(dep_node.head_tags)
+        polymer_tags.extend(dep_node.polymer_tags)
 
-        for el in dep_node.head_tags:
-            if el.tag == 'script':
-                script_elements.append(el)
-            else:
-                head_tags.append(el)
-
-        for el in dep_node.polymer_elements:
-            polymer_elements.append(el)
-            script_elements.extend(el.findall('script'))
-
-        for el in script_elements:
+        for el in dep_node.script_tags:
             try:
                 script = resolver.resolve_script(dep_node.relative_url, el)
             except InvalidScriptError as e:
-                logging.debug('Ignoring invalid script type %s', e)
+                logging.debug('Ignoring invalid script: %r', str(e))
+                continue
 
             if (script.relative_url is not None and
                     not file_index.add(script.relative_url, script.path)):
                 continue
+            script_tags.append(script)
 
-            scripts.append(script)
+        for el in dep_node.link_tags:
+            try:
+                link = resolver.resolve_link(dep_node.relative_url, el)
+            except InvalidLinkError as e:
+                logging.debug('Ignoring invalid link: %r', str(e))
+                continue
 
-    return head_tags, polymer_elements, scripts
+            if (link.relative_url is not None and
+                    not file_index.add(link.relative_url, link.path)):
+                continue
+            link_tags.append(link)
+
+    return MergedDependencies(
+        head_tags=head_tags,
+        polymer_tags=polymer_tags,
+        script_tags=script_tags,
+        link_tags=link_tags)
 
 
 def extract_body(root):
@@ -258,15 +308,29 @@ TEMPLATE = """<!doctype html>
 </html>
 """
 
-def assemble(root_file, head_tags, polymer_elements, scripts):
+def assemble(root_file, merged):
     root_el = html.Element('html')
 
     head_el = html.Element('head')
     root_el.append(head_el)
 
-    for tag in head_tags:
+    for tag in root_file.head_tags:
         copied = deepcopy(tag)
         head_el.append(copied)
+
+    for tag in merged.link_tags:
+        copied = deepcopy(tag.el)
+        print '!!!'
+        print html.tostring(copied)
+        print '!!!'
+        head_el.append(copied)
+
+    for tag in merged.script_tags:
+        if not tag.path and not tag.text:
+            # This is an external script that can't be resolved to
+            # a local path and thus can't be vulcanized.
+            copied = deepcopy(tag.el)
+            head_el.append(copied)
 
     body_el = html.Element('body')
     root_el.append(body_el)
@@ -274,15 +338,16 @@ def assemble(root_file, head_tags, polymer_elements, scripts):
     hidden_el = html.Element('div', attrib={'hidden': 'hidden'})
     body_el.append(hidden_el)
 
-    for tag in polymer_elements:
+    for tag in merged.polymer_tags:
         copied = deepcopy(tag)
-        # Remove all scripts from Polymer elements since these will
-        # be in the vulcanized JS file.
+        # Remove any child script and link tags from Polymer elements because
+        # these will already exist in the vulcanized file or head.
         for el in copied.findall('script'):
+            copied.remove(el)
+        for el in copied.findall('link'):
             copied.remove(el)
         hidden_el.append(copied)
 
-    print html.tostring(root_el)
     return root_el
 
 
@@ -291,9 +356,9 @@ logging.getLogger().setLevel(logging.DEBUG)
 resolver = PathResolver('', './example/')
 root_file = resolver.resolve_html('index.html')
 all_nodes, file_index = traverse(root_file, resolver)
-head_tags, polymer_elements, scripts = merge_nodes(
-    all_nodes, file_index, resolver)
+merged = merge_nodes(all_nodes, file_index, resolver)
+root_el = assemble(root_file, merged)
 
-assemble(root_file, head_tags, polymer_elements, scripts)
+print html.tostring(root_el)
 
 import pdb; pdb.set_trace()
