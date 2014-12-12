@@ -5,13 +5,13 @@ from setuptools import setup
 setup(
     name = 'vulcanize',
     packages = ['vulcanize'],
-    version = '0.1.3',
+    version = '0.2',
     description = 'Vulcanizes HTML files that use Polymer',
     author = 'Brett Slatkin',
     author_email = 'brett@haxor.com',
     url = 'https://github.com/bslatkin/pyvulcanize',
     keywords = ['polymer'],
-    install_requires=['lxml'],
+    install_requires=['lxml', 'html5lib'],
     entry_points={
         'console_scripts': [
             'vulcanize=vulcanize.__main__:main',

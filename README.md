@@ -2,7 +2,7 @@
 
 *This is still a work in progress.*
 
-A pure Python implementation of the [vulcanize tool](https://github.com/Polymer/vulcanize) that is part of the [Polymer project](https://www.polymer-project.org).
+A Python implementation of the [vulcanize tool](https://github.com/Polymer/vulcanize) that is part of the [Polymer project](https://www.polymer-project.org).
 
 Why Python? Because my server is written in Python. I don't want to run node.js on the side during development just to regenerate vulcanized files on the fly. Oh-- and I want vulcanized files during development because the number of static resources I need to load for a large project gets excruciatingly slow to transfer, even on localhost (there are just too many HTTP requests to make).
 
