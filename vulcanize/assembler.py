@@ -128,7 +128,8 @@ def assemble(root_file, traverse):
     hidden_el = html.Element('div', attrib={'hidden': 'hidden'})
     body_el.append(hidden_el)
 
-    combined_script = StringIO()
+    combined_head_script = StringIO()
+    combined_body_script = StringIO()
 
     for tag in traverse(root_file):
         logging.debug('Assembling %r', tag)
@@ -152,17 +153,21 @@ def assemble(root_file, traverse):
                 remove_node(tag.el)
                 head_el.append(copied)
         elif isinstance(tag, importer.ImportedStyle):
-            # Move the style tag to the root.
-            copied = copy_clean(tag.el)
-            remove_node(tag.el)
-            head_el.append(copied)
-        elif isinstance(tag, importer.ImportedScript):
-            if tag.text:
+            # Move the style tag to the root if it's not part of a
+            # polymer element.
+            if tag.polymer_element_ancestor is None:
+                copied = copy_clean(tag.el)
                 remove_node(tag.el)
-                if tag.relative_url:
-                    combined_script.write('\n// %s\n' % tag.relative_url)
-                combined_script.write(tag.text)
-                combined_script.write('\n;\n')
+                head_el.append(copied)
+        elif isinstance(tag, importer.ImportedScript):
+            if not tag.is_included_resource:
+                remove_node(tag.el)
+                if tag.polymer_element_ancestor is not None:
+                    combined_body_script.write(tag.text)
+                    combined_body_script.write('\n;\n')
+                else:
+                    combined_head_script.write(tag.text)
+                    combined_head_script.write('\n;\n')
             else:
                 # External script that can't be vulcanized.
                 copied = copy_clean(tag.el)
@@ -185,9 +190,17 @@ def assemble(root_file, traverse):
     for tag in reversed(root_file.head_tags):
         head_el.insert(0, tag)
 
-    # TODO: Split this into a separate file that can have a sourcemap.
-    combined_el = html.Element('script', attrib={'type': 'text/javascript'})
-    combined_el.text = combined_script.getvalue().decode('utf-8')
-    body_el.append(combined_el)
+    # TODO: Split these into separate files that can have sourcemaps.
+
+    head_script_el = html.Element('script', attrib={'type': 'text/javascript'})
+    head_script_el.text = combined_head_script.getvalue().decode('utf-8')
+    # The head script must come before *everything* else because polymer is
+    # sensitive about other resources that are loading from remote URLs, such
+    # as link tags.
+    head_el.insert(0, head_script_el)
+
+    body_script_el = html.Element('script', attrib={'type': 'text/javascript'})
+    body_script_el.text = combined_body_script.getvalue().decode('utf-8')
+    body_el.append(body_script_el)
 
     return root_el

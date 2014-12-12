@@ -119,25 +119,26 @@ class ImportedScript(ImportedTag):
         self.text = text
 
     def parse(self):
+        if self.path:
+            # Local resource can be read and possibly inlined.
+            assert not self.text
+            with open(self.path) as handle:
+                self.text = handle.read()
+
+        if self.relative_url:
+            self.text = '// From %s\n%s' % (self.relative_url, self.text)
+
         if self.text:
             # Escape any </script> close tags because those will break the
             # parser. Notably, CDATA is ignored with HTML5 parsing rules, so
             # that can't help.
             self.text = self.text.replace('</script>', '<\/script>')
 
-        self.rewrite_name()
+        if self.polymer_element_ancestor is not None:
+            self.rewrite_constructor()
 
-        # Rewrite relative URLs to be relative to the index file.
-        if self.relative_url:
-            self.el.attrib['src'] = self.relative_url
-
-    def rewrite_name(self):
-        # Determine if we need to rewrite a Polymer() constructor.
-        parent = polymer_element_ancestor(self.el)
-        if parent is None:
-            return
-
-        name = parent.attrib['name']
+    def rewrite_constructor(self):
+        name = self.polymer_element_ancestor.attrib['name']
         match = re.search(
             r'Polymer\(\s*([\'\"]([^\'\"]+)[\'\"]\s*)?\s*([^\)])?',
             self.text)
@@ -163,11 +164,13 @@ class ImportedScript(ImportedTag):
 
     @property
     def is_included_resource(self):
-        return self.el.attrib.get('src') is not None
+        return self.relative_url and not self.text
 
     def __repr__(self):
         if self.is_included_resource:
             return 'ImportedScript(relative_url=%r)' % self.relative_url
+        elif self.path:
+            return 'ImportedScript(path=%r)' % self.path
         elif self.text:
             return 'ImportedScript(%.40r...)' % self.text
         else:
@@ -330,7 +333,8 @@ class Importer(object):
             # The script is inline.
             return ImportedScript(script_el, text=script_el.text)
         else:
-            # The script is an external resource so we shouldn't vulcanize.
+            # The script is an external resource (which may or may not
+            # be locally available).
             relative_url, path = self.resolve(
                 script_src, parent_relative_url=parent_relative_url)
             return ImportedScript(
