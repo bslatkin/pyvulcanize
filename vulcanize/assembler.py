@@ -136,8 +136,16 @@ def assemble(root_file, traverse):
         if isinstance(tag, importer.ImportedLink):
             if tag.replacement is not None:
                 # CSS that can be inlined.
-                tag.el.addprevious(tag.replacement)
-                remove_node(tag.el)
+                if tag.polymer_element_ancestor is not None:
+                    # Inlined directly into the polymer-element so it's
+                    # part of that template's shadow dom.
+                    tag.el.addprevious(tag.replacement)
+                    remove_node(tag.el)
+                else:
+                    # Can be inlined, but must be put into head because
+                    # it didn't appear within a polymer-element.
+                    remove_node(tag.el)
+                    head_el.append(tag.replacement)
             else:
                 # External link that can't be vulcanized.
                 copied = copy_clean(tag.el)

@@ -33,6 +33,7 @@ Bugs:
 - `@import` in linked stylesheets won't be inlined
 - `url()` or `@import` in linked stylesheets won't be adjusted for relative paths
 - Doesn't handle [no-script Polymer elements](https://www.polymer-project.org/docs/polymer/polymer.html#altregistration) that don't explicitly call `Polymer()`
+- Doesn't inline `<script src="...">` that is accessible in the resources local to the index file.
 
 Missing features:
 

@@ -47,6 +47,7 @@ class ImportedTag(object):
         self.path = path
         self.el = el
         self.resource_tags = []
+        self.polymer_element_ancestor = None
 
     def parse(self):
         pass
@@ -201,7 +202,7 @@ class ImportedLink(ImportedTag):
         with open(self.path) as handle:
             output.write(handle.read())
 
-        self.replacement_text = output.getvalue()
+        self.replacement.text = output.getvalue()
 
         # TODO: Rewrite url() in the included file in case the path of the
         # link is different than the path of what included it.
@@ -303,6 +304,7 @@ class Importer(object):
         else:
             assert False
 
+        result.polymer_element_ancestor = polymer_element_ancestor(el)
         result.parse()
         return result
 

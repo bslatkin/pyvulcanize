@@ -279,7 +279,19 @@ html /deep/ [segment], html /deep/ segment {
   border-radius: 5px 5px 5px 5px;
 }
 
-</style><script src="example/bower_components/polymer/polymer.js"></script></head><body><div hidden="hidden"><polymer-element name="y-import">
+</style><script src="example/bower_components/polymer/polymer.js"></script><style>
+/* From example/empty.css */
+/*
+ * @license
+ * Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+ * This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+ * The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+ * The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+ * Code distributed by Google as part of the polymer project is also
+ * subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+ */
+
+</style></head><body><div hidden="hidden"><polymer-element name="y-import">
   <template>
     <style>
       :host{
@@ -291,7 +303,9 @@ html /deep/ [segment], html /deep/ segment {
   
 </polymer-element><polymer-element name="x-import">
   <template>
-  <style shim-shadowdom="">/*
+  <style shim-shadowdom="">
+/* From example/import-test.css */
+/*
  * @license
  * Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
  * This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
@@ -350,14 +364,7 @@ polyfill-next-selector { content: 'I WIN'; }
   
   </polymer-element><polymer-element attributes="" name="x-bar">
   
-  </polymer-element></div><x-import>Hello Import!</x-import>
-  <y-import></y-import>
-  
-  
-  
-
-
-<script type="text/javascript">
+  </polymer-element></div><x-import>Hello Import!</x-import><y-import></y-import><script type="text/javascript">
     Polymer('y-import');
   
 ;
