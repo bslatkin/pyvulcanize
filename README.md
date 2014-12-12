@@ -17,7 +17,6 @@ Bugs:
 - [Conditional binding syntax](https://www.polymer-project.org/docs/polymer/binding-types.html#conditional-attributes) doesn't work (i.e., `attribute?="value"``)
 - `@import` in linked stylesheets won't be inlined
 - `url()` or `@import` in linked stylesheets won't be adjusted for relative paths
-- Document-level `<style>` tags aren't getting copied through
 
 Missing features:
 

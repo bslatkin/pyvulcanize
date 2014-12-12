@@ -135,6 +135,11 @@ def assemble(root_file, traverse):
                 copied = copy_clean(tag.el)
                 remove_node(tag.el)
                 head_el.append(copied)
+        elif isinstance(tag, importer.ImportedStyle):
+            # Move the style tag to the root.
+            copied = copy_clean(tag.el)
+            remove_node(tag.el)
+            head_el.append(copied)
         elif isinstance(tag, importer.ImportedScript):
             if tag.text:
                 remove_node(tag.el)

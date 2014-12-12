@@ -65,7 +65,7 @@ class ImportedHtml(ImportedTag):
 
         # Consider scripts and links in the order they appear in the document.
         for el in self.el.findall('//*'):
-            if el.tag not in ('script', 'link'):
+            if el.tag not in ('script', 'link', 'style'):
                 continue
             if el.xpath('ancestor::polymer-element'):
                 # Ignore scripts and links that appear within a polymer
@@ -184,6 +184,13 @@ class ImportedLink(ImportedTag):
         # TODO: transitively include @import references?
 
 
+class ImportedStyle(ImportedTag):
+
+    def __init__(self, style_el):
+        super(ImportedStyle, self).__init__(
+            relative_url=None, path=None, el=style_el)
+
+
 class ImportedPolymerElement(ImportedTag):
 
     def __init__(self, polymer_el):
@@ -254,6 +261,8 @@ class Importer(object):
                 result = self.import_link(parent_relative_url, el)
         elif el.tag == 'polymer-element':
             result = self.import_polymer_element(parent_relative_url, el)
+        elif el.tag == 'style':
+            result = self.import_style(parent_relative_url, el)
         else:
             assert False
 
@@ -301,3 +310,6 @@ class Importer(object):
 
     def import_polymer_element(self, parent_relative_url, polymer_el):
         return ImportedPolymerElement(polymer_el)
+
+    def import_style(self, parent_relative_url, style_el):
+        return ImportedStyle(style_el)
