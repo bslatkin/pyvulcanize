@@ -67,6 +67,8 @@ class Flags(object):
         self.parser.parse_args(namespace=self)
         if not self.index_path:
             self.parser.error('index_path required')
+        if not os.path.isfile(self.index_path):
+            self.parser.error('index_path %r does not exist' % self.index_path)
 
 
 FLAGS = Flags()

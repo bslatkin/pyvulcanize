@@ -18,6 +18,10 @@ import SimpleHTTPServer
 import SocketServer
 import logging
 import os
+import signal
+import sys
+import threading
+import time
 
 from . pipeline import vulcanize
 
@@ -30,11 +34,6 @@ def get_handler(root_dir, index_path):
             if self.path == '/':
                 self.wfile.write(vulcanize(root_dir, index_path))
             else:
-                index_dir = os.path.dirname(index_path)
-                relative_resource = self.path[1:]
-                adjusted_path = os.path.join(index_dir, relative_resource)
-                normalized_path = os.path.normpath(adjusted_path)
-                self.path = normalized_path
                 return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
     return Handler
@@ -45,4 +44,11 @@ def run_server(host, port, root_dir, index_path):
     server = SocketServer.TCPServer((host, port), handler)
     host, port = server.server_address
     logging.info('Serving on %s:%d', host, port)
-    server.serve_forever()
+
+    threading.Thread(target=server.serve_forever).start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info('Terminating')
+        server.shutdown()

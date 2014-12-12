@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from lxml import html
+import os
 
 from . import assembler
 from . import importer
@@ -32,6 +33,10 @@ def vulcanize(root_dir, index_path):
 
     Returns:
         String of the vulcanized file.
+
+    Raises:
+        IOError if the target index_path or any of its dependencies
+        don't exist on disk.
     """
     resolver = importer.PathResolver(root_dir, index_path)
     import_tag = importer.Importer(resolver)
