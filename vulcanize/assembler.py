@@ -66,7 +66,7 @@ class Traverser(object):
                 remove_node(el)
                 continue
 
-            if (dep.relative_url is not None and
+            if (dep.is_included_resource and
                     not self.file_index.add(dep.relative_url, dep.path)):
                 # Resource already included.
                 continue

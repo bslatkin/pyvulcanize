@@ -43,6 +43,10 @@ class ImportedTag(object):
     def parse(self):
         pass
 
+    @property
+    def is_included_resource(self):
+        return self.relative_url is not None
+
     def __repr__(self):
         return '%s(relative_url=%r, path=%r, el=%r)' % (
             self.__class__.__name__, self.relative_url, self.path, self.el)
@@ -143,6 +147,10 @@ class ImportedScript(ImportedTag):
         self.text = "%sPolymer('%s'%s%s%s" % (
             before, name, middle, closing, after)
 
+    @property
+    def is_included_resource(self):
+        return self.el.attrib.get('src') is not None
+
     def __repr__(self):
         if self.relative_url:
             return 'ImportedScript(relative_url=%r)' % self.relative_url
@@ -189,6 +197,10 @@ class ImportedStyle(ImportedTag):
         super(ImportedStyle, self).__init__(
             relative_url=None, path=None, el=style_el)
 
+    @property
+    def is_included_resource(self):
+        return False
+
 
 class ImportedPolymerElement(ImportedTag):
 
@@ -204,6 +216,10 @@ class ImportedPolymerElement(ImportedTag):
             if child_el.tag not in ('script', 'link'):
                 continue
             self.resource_tags.append(child_el)
+
+    @property
+    def is_included_resource(self):
+        return False
 
 
 class PathResolver(object):
@@ -306,9 +322,6 @@ class Importer(object):
             href = link_el.attrib['href']
         except KeyError:
             raise InvalidLinkError(html.tostring(link_el))
-
-        if 'core-header-panel.css' in href:
-            import pdb; pdb.set_trace()
 
         relative_url, path = self.resolve(
             href, parent_relative_url=parent_relative_url)
