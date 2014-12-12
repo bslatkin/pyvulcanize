@@ -17,8 +17,11 @@
 from copy import deepcopy
 from cStringIO import StringIO
 import logging
+
+from lxml import etree
 from lxml import html
 
+from . import errors
 from . import importer
 
 
@@ -57,11 +60,11 @@ class Traverser(object):
 
             try:
                 dep = self.import_tag(node.relative_url, el)
-            except importer.InvalidScriptError as e:
+            except errors.InvalidScriptError as e:
                 logging.debug('Removing invalid script: %r', str(e))
                 remove_node(el)
                 continue
-            except importer.InvalidLinkError as e:
+            except errors.InvalidLinkError as e:
                 logging.debug('Removing invalid link: %r', str(e))
                 remove_node(el)
                 continue

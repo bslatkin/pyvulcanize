@@ -15,21 +15,28 @@
 # limitations under the License.
 
 import logging
-from lxml import html
 import os.path
 import re
+import warnings
+
+import html5lib
+from html5lib import ihatexml
+from html5lib.constants import DataLossWarning
+from lxml import html
+
+from . import errors
+
+# Ignore coertion warnings from html5lib. This happens because of foo ?= "bar"
+# conditional attribute expressions in the HTML documents. We compensate for
+# this in pipeline.py when we reserialize the document.
+warnings.simplefilter('ignore', DataLossWarning)
 
 
-class Error(Exception):
-    pass
-
-
-class InvalidScriptError(Error):
-    pass
-
-
-class InvalidLinkError(Error):
-    pass
+def polymer_element_ancestor(el):
+    for parent_el in reversed(el.xpath('ancestor::*')):
+        if parent_el.tag == 'polymer-element':
+            return parent_el
+    return None
 
 
 class ImportedTag(object):
@@ -61,7 +68,15 @@ class ImportedHtml(ImportedTag):
         self.body_tags = []
 
     def parse(self):
-        self.el = html.parse(self.path)
+        tree_builder = html5lib.getTreeBuilder('lxml')
+        parser = html5lib.HTMLParser(
+            namespaceHTMLElements=False,
+            tree=tree_builder,
+            debug=True)
+        with open(self.path) as handle:
+            self.el = parser.parse(
+                handle,
+                encoding='utf-8')
 
         seen_tags = set()
 
@@ -69,7 +84,7 @@ class ImportedHtml(ImportedTag):
         for el in self.el.findall('//*'):
             if el.tag not in ('script', 'link', 'style'):
                 continue
-            if el.xpath('ancestor::polymer-element'):
+            if polymer_element_ancestor(el) is not None:
                 # Ignore scripts and links that appear within a polymer
                 # element tag. Those will be handled by ImportedPolymerElement.
                 continue
@@ -116,12 +131,9 @@ class ImportedScript(ImportedTag):
 
     def rewrite_name(self):
         # Determine if we need to rewrite a Polymer() constructor.
-        parent = self.el.xpath('ancestor::polymer-element')
-        if not parent:
+        parent = polymer_element_ancestor(self.el)
+        if parent is None:
             return
-
-        assert len(parent) == 1
-        parent = parent[0]
 
         name = parent.attrib['name']
         match = re.search(
@@ -302,7 +314,7 @@ class Importer(object):
             pass  # Defaults to JavaScript
         else:
             if script_type.lower() != 'text/javascript':
-                raise InvalidScriptError(html.tostring(script_el))
+                raise errors.InvalidScriptError(html.tostring(script_el))
 
         try:
             script_src = script_el.attrib['src']
@@ -321,7 +333,7 @@ class Importer(object):
             rel = link_el.attrib['rel']
             href = link_el.attrib['href']
         except KeyError:
-            raise InvalidLinkError(html.tostring(link_el))
+            raise errors.InvalidLinkError(html.tostring(link_el))
 
         relative_url, path = self.resolve(
             href, parent_relative_url=parent_relative_url)

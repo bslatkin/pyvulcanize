@@ -14,8 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from lxml import html
+from cStringIO import StringIO
 import os
+
+import html5lib
 
 from . import assembler
 from . import importer
@@ -44,4 +46,29 @@ def vulcanize(root_dir, index_path):
     root_file.parse()
     traverser = assembler.Traverser(import_tag)
     root_el = assembler.assemble(root_file, traverser)
-    return html.tostring(root_el, doctype='<!doctype html>')
+
+    walker = html5lib.getTreeWalker('lxml')
+    stream = walker(root_el)
+    serializer = html5lib.serializer.HTMLSerializer(
+        quote_attr_values=True,
+        sanitize=False,
+        inject_meta_charset=False,
+        resolve_entities=False,
+        strip_whitespace=False,
+        omit_optional_tags=False,
+        minimize_boolean_attributes=True)
+
+    output = StringIO()
+    output.write('<!doctype html>\n')
+
+    for token in serializer.serialize(stream, encoding='utf-8'):
+        # This is super gross, but lxml is going to sanitize the input and
+        # drop Polymer's conditional attribute names that look like:
+        # foo ?= "bar". This code reverses the way html5lib coerces the
+        # bad attribute values to something that lxml can handle.
+        if token.endswith('U0003F'):
+            token = token[:-len('U0003F')] + '?'
+
+        output.write(token)
+
+    return output.getvalue()
