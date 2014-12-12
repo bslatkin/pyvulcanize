@@ -167,9 +167,13 @@ class ImportedLink(ImportedTag):
         if self.el.attrib.get('rel') != 'stylesheet':
             return
 
-        # TODO: Copy through other attributes
+        attrib = {}
+        for key, value in self.el.attrib.iteritems():
+            if key in ('rel', 'href', 'type'):
+                continue
+            attrib[key] = value
 
-        self.replacement = html.Element('style', attrib={'type': 'text/css'})
+        self.replacement = html.Element('style', attrib=attrib)
 
         with open(self.path) as handle:
             self.replacement.text = handle.read()

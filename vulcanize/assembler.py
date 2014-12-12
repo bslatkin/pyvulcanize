@@ -109,7 +109,7 @@ def copy_clean(el):
 
 
 def assemble(root_file, traverse):
-    root_el = html.Element('html')
+    root_el = html.Element('html', attrib=root_file.el.getroot().attrib)
 
     head_el = html.Element('head')
     root_el.append(head_el)
