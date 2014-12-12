@@ -1,17 +1,22 @@
 #!/usr/bin/env python2.7
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name = 'vulcanize',
     packages = ['vulcanize'],
-    version = '0.1.1',
+    version = '0.1.3',
     description = 'Vulcanizes HTML files that use Polymer',
     author = 'Brett Slatkin',
     author_email = 'brett@haxor.com',
     url = 'https://github.com/bslatkin/pyvulcanize',
     keywords = ['polymer'],
     install_requires=['lxml'],
+    entry_points={
+        'console_scripts': [
+            'vulcanize=vulcanize.__main__:main',
+        ]
+    },
     classifiers = [
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',

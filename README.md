@@ -111,6 +111,20 @@ python -m SimpleHTTPServer 8080 ./example
 
 And then visit <http://localhost:8080/test.html>. If you see a big green square with JS on it, you're good.
 
+#### 4. Building a new version
+
+Create a new tarball:
+
+```
+python setup.py sdist
+```
+
+Upload it!
+
+```
+twine upload ./dist/path-to-the-new-tarball
+```
+
 ## About
 
 Written by [Brett Slatkin](http://www.onebigfluke.com)
