@@ -167,10 +167,17 @@ class ImportedLink(ImportedTag):
         if self.el.attrib.get('rel') != 'stylesheet':
             return
 
+        # TODO: Copy through other attributes
+
         self.replacement = html.Element('style', attrib={'type': 'text/css'})
 
         with open(self.path) as handle:
             self.replacement.text = handle.read()
+
+        # TODO: Rewrite url() in the included file in case the path of the
+        # link is different than the path of what included it.
+
+        # TODO: transitively include @import references?
 
 
 class ImportedPolymerElement(ImportedTag):

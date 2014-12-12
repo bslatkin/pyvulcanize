@@ -6,17 +6,25 @@ A pure Python implementation of the [vulcanize tool](https://github.com/Polymer/
 
 Why Python? Because my server is written in Python. I don't want to run node.js on the side during development just to regenerate vulcanized files on the fly. Oh-- and I want vulcanized files during development because the number of static resources I need to load for a large project gets excruciatingly slow to transfer, even on localhost (there are just too many HTTP requests to make).
 
-## TODO:
-
-- Output a concatenated JavaScript file
-- Generate source maps for the JavaScript files
-- WSGI component for serving vulcanized files and original sources
-- setup.py and pypi
-- tests
-
 ## Using the tool
 
 TODO: Write this
+
+## Known limitations
+
+Bugs:
+
+- [Conditional binding syntax](https://www.polymer-project.org/docs/polymer/binding-types.html#conditional-attributes) doesn't work (i.e., `attribute?="value"``)
+- `@import` in linked stylesheets won't be inlined
+- `url()` or `@import` in linked stylesheets won't be adjusted for relative paths
+- Document-level `<style>` tags aren't getting copied through
+
+Missing features:
+
+- Tests
+- setup.py and pypi
+- Output a concatenated JavaScript file
+- Generate source maps for the JavaScript files
 
 ## Test the tool during development
 
