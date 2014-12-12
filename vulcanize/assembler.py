@@ -44,9 +44,9 @@ class Traverser(object):
         self.file_index = FileIndex()
 
     def __call__(self, node):
-        """
-        Breadth-first search. Order of returned nodes matters because
-        that's dependency order.
+        """Traverse all dependencies in the given node.
+
+        Breadth-first search. Order of returned nodes matches document order.
         """
         # After going depth-first on the resources, figure out which of
         # the script tags and link tags we need to track for this node.
@@ -76,9 +76,9 @@ class Traverser(object):
 
 
 def remove_node(el):
-    """
-    Clear any funky tail text that may be after certain html elements
-    like <link> with no closing </link> tag.
+    """Clear any funky tail text.
+
+    This may come after certain html elements like <link>.
     """
     parent = el.getparent()
     if not el.tail:
@@ -172,7 +172,5 @@ def assemble(root_file, traverse):
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
     combined_el.text = combined_script.getvalue().decode('utf-8')
     body_el.append(combined_el)
-
-
 
     return root_el

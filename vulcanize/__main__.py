@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""TODO"""
+"""Tool for vulcanizing resources in Polymer applications."""
 
 import argparse
 import logging

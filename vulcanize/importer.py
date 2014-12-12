@@ -20,9 +20,6 @@ import os.path
 import re
 
 
-# TODO: Handle no-script Polymer elements that don't explicitly call Polymer()
-
-
 class Error(Exception):
     pass
 
@@ -198,6 +195,9 @@ class ImportedPolymerElement(ImportedTag):
             relative_url=None, path=None, el=polymer_el)
 
     def parse(self):
+        # TODO: Handle no-script Polymer elements that don't explicitly
+        # call Polymer() in a child script tag.
+
         for child_el in self.el.findall('.//*'):
             if child_el.tag not in ('script', 'link'):
                 continue

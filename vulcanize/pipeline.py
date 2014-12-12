@@ -25,6 +25,14 @@ __all__ = ['vulcanize']
 
 
 def vulcanize(index_path):
+    """Vulcanize the HTML file at the given path.
+
+    Args:
+        index_path: Path to the HTML file to vulcanize.
+
+    Returns:
+        String of the vulcanized file.
+    """
     index_relative_url = os.path.basename(index_path)
     resolver = importer.PathResolver(index_relative_url, index_path)
     import_tag = importer.Importer(resolver)
