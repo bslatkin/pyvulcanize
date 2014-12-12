@@ -8,9 +8,23 @@ Why Python? Because my server is written in Python. I don't want to run node.js 
 
 ## Using the tool
 
-TODO: Write this
+Install it:
 
+```
+pip install vulcanize
+```
 
+Vulcanize an index file (and all its dependencies) into an output file:
+
+```
+vulcanize path/to/index.html -o path/to/output.html
+```
+
+Run a server that vulcanizes on every reload:
+
+```
+vulcanize path/to/index.html -p 8080
+```
 
 ## Known limitations
 
@@ -23,7 +37,6 @@ Bugs:
 
 Missing features:
 
-- setup.py and pypi
 - Output a concatenated JavaScript file
 - Generate source maps for the JavaScript files
 
