@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cStringIO import StringIO
 import logging
 import os.path
 import re
@@ -164,10 +165,10 @@ class ImportedScript(ImportedTag):
         return self.el.attrib.get('src') is not None
 
     def __repr__(self):
-        if self.relative_url:
+        if self.is_included_resource:
             return 'ImportedScript(relative_url=%r)' % self.relative_url
         elif self.text:
-            return 'ImportedScript(%r)' % self.text
+            return 'ImportedScript(%.40r...)' % self.text
         else:
             assert False, 'Bad ImportedScript'
 
@@ -194,8 +195,13 @@ class ImportedLink(ImportedTag):
 
         self.replacement = html.Element('style', attrib=attrib)
 
+        output = StringIO()
+        output.write('\n/* From %s */\n' % self.relative_url)
+
         with open(self.path) as handle:
-            self.replacement.text = handle.read()
+            output.write(handle.read())
+
+        self.replacement_text = output.getvalue()
 
         # TODO: Rewrite url() in the included file in case the path of the
         # link is different than the path of what included it.

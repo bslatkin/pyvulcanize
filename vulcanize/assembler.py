@@ -86,6 +86,9 @@ def remove_node(el):
     This may come after certain html elements like <link>.
     """
     parent = el.getparent()
+    if parent is None:
+        return
+
     if not el.tail:
         parent.remove(el)
         return
@@ -161,17 +164,18 @@ def assemble(root_file, traverse):
             copied = copy_clean(tag.el)
             remove_node(tag.el)
             hidden_el.append(copied)
+        elif isinstance(tag, importer.ImportedHtml):
+            for child_tag in tag.body_tags:
+                copied = copy_clean(child_tag)
+                remove_node(child_tag)
+                body_el.append(copied)
 
-    # Add the head and body tags in last, after all of the calls to
-    # remove_node above have been able to copy tail text around in the
-    # original documents as necessary. The head tags will go in before
-    # all of the other content that's already in there. The body tags will
-    # go in natural document order.
+    # Add the head tags in last, after all of the calls to remove_node above
+    # have been able to copy tail text around in the original documents as
+    # necessary. The head tags will go in before all of the other content that's
+    # already in there.
     for tag in reversed(root_file.head_tags):
         head_el.insert(0, tag)
-
-    for tag in root_file.body_tags:
-        body_el.append(tag)
 
     # TODO: Split this into a separate file that can have a sourcemap.
     combined_el = html.Element('script', attrib={'type': 'text/javascript'})
