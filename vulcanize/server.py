@@ -22,13 +22,13 @@ import os
 from . pipeline import vulcanize
 
 
-def get_handler(index_path):
+def get_handler(root_dir, index_path):
     """Wraps the parameters for the server in a closure."""
 
     class Handler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         def do_GET(self):
             if self.path == '/':
-                self.wfile.write(vulcanize(index_path))
+                self.wfile.write(vulcanize(root_dir, index_path))
             else:
                 index_dir = os.path.dirname(index_path)
                 relative_resource = self.path[1:]
@@ -40,8 +40,8 @@ def get_handler(index_path):
     return Handler
 
 
-def run_server(host, port, index_path):
-    handler = get_handler(index_path)
+def run_server(host, port, root_dir, index_path):
+    handler = get_handler(root_dir, index_path)
     server = SocketServer.TCPServer((host, port), handler)
     host, port = server.server_address
     logging.info('Serving on %s:%d', host, port)

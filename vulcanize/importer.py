@@ -34,7 +34,7 @@ class InvalidLinkError(Error):
 
 class ImportedTag(object):
 
-    def __init__(self, relative_url, path, el):
+    def __init__(self, relative_url=None, path=None, el=None):
         self.relative_url = relative_url
         self.path = path
         self.el = el
@@ -51,7 +51,8 @@ class ImportedTag(object):
 class ImportedHtml(ImportedTag):
 
     def __init__(self, relative_url, path):
-        super(ImportedHtml, self).__init__(relative_url, path, None)
+        super(ImportedHtml, self).__init__(
+            relative_url=relative_url, path=path)
         self.head_tags = []
         self.body_tags = []
 
@@ -91,8 +92,9 @@ class ImportedHtml(ImportedTag):
 
 class ImportedScript(ImportedTag):
 
-    def __init__(self, script_el, text=None, relative_url=None):
-        super(ImportedScript, self).__init__(relative_url, None, script_el)
+    def __init__(self, script_el, text=None, relative_url=None, path=None):
+        super(ImportedScript, self).__init__(
+            relative_url=relative_url, path=path, el=script_el)
         self.text = text
 
     def parse(self):
@@ -154,7 +156,7 @@ class ImportedLink(ImportedTag):
 
     def __init__(self, relative_url, link_el, path=None):
         super(ImportedLink, self).__init__(
-            relative_url, path=path, el=link_el)
+            relative_url=relative_url, path=path, el=link_el)
         self.replacement = None
 
     def parse(self):
@@ -190,9 +192,9 @@ class ImportedStyle(ImportedTag):
 
 class ImportedPolymerElement(ImportedTag):
 
-    def __init__(self, polymer_el):
+    def __init__(self, parent_relative_url, polymer_el):
         super(ImportedPolymerElement, self).__init__(
-            relative_url=None, path=None, el=polymer_el)
+            relative_url=parent_relative_url, path=None, el=polymer_el)
 
     def parse(self):
         # TODO: Handle no-script Polymer elements that don't explicitly
@@ -206,11 +208,16 @@ class ImportedPolymerElement(ImportedTag):
 
 class PathResolver(object):
 
-    def __init__(self, index_relative_url, index_path):
-        self.index_relative_url = index_relative_url
+    def __init__(self, root_dir, index_path):
         self.index_path = index_path
+        self.root_dir = root_dir
+
+        abs_dir = os.path.abspath(self.root_dir)
+        abs_index = os.path.abspath(self.index_path)
+        index_relative_url = abs_index[len(abs_dir) + 1:]
+
+        self.index_relative_url = index_relative_url
         self.root_url = os.path.dirname(index_relative_url)
-        self.root_dir = os.path.dirname(index_path)
 
     def __call__(self, relative_url, parent_relative_url=None):
         if (relative_url.startswith('http://') or
@@ -231,12 +238,8 @@ class PathResolver(object):
         # Normalize and remove '..' and other relative path pieces.
         normalized_relative_url = os.path.normpath(resolved_relative_url)
 
-        # Strip the common prefix of the URL serving. What's left relative to
-        # the path directory is the path to the file on disk.
-        relative_path = normalized_relative_url[len(self.root_url):]
-
         return (normalized_relative_url,
-                os.path.join(self.root_dir, relative_path))
+                os.path.join(self.root_dir, normalized_relative_url))
 
 
 class Importer(object):
@@ -292,9 +295,10 @@ class Importer(object):
             return ImportedScript(script_el, text=script_el.text)
         else:
             # The script is an external resource so we shouldn't vulcanize.
-            relative_url, _ = self.resolve(
+            relative_url, path = self.resolve(
                 script_src, parent_relative_url=parent_relative_url)
-            return ImportedScript(script_el, relative_url=relative_url)
+            return ImportedScript(
+                script_el, relative_url=relative_url, path=path)
 
     def import_link(self, parent_relative_url, link_el):
         try:
@@ -303,13 +307,17 @@ class Importer(object):
         except KeyError:
             raise InvalidLinkError(html.tostring(link_el))
 
+        if 'core-header-panel.css' in href:
+            import pdb; pdb.set_trace()
+
         relative_url, path = self.resolve(
             href, parent_relative_url=parent_relative_url)
 
         return ImportedLink(relative_url, link_el, path=path)
 
     def import_polymer_element(self, parent_relative_url, polymer_el):
-        return ImportedPolymerElement(polymer_el)
+        return ImportedPolymerElement(
+            parent_relative_url, polymer_el)
 
     def import_style(self, parent_relative_url, style_el):
         return ImportedStyle(style_el)

@@ -14,10 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool for vulcanizing resources in Polymer applications."""
+"""Tool for vulcanizing resources in Polymer applications.
+
+The current working directory will be used as the vulcanizing root.
+"""
 
 import argparse
 import logging
+import os
 import sys
 
 from . pipeline import vulcanize
@@ -75,10 +79,10 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
 
     if FLAGS.port:
-        run_server(FLAGS.host, FLAGS.port, FLAGS.index_path)
+        run_server(FLAGS.host, FLAGS.port, os.getcwd(), FLAGS.index_path)
         return 0
 
-    result = vulcanize(FLAGS.index_path)
+    result = vulcanize(os.getcwd(), FLAGS.index_path)
 
     if FLAGS.output:
         with open(FLAGS.output, 'wb') as handle:

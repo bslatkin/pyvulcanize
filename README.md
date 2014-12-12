@@ -124,6 +124,12 @@ python -m SimpleHTTPServer 8080 ./example
 
 And then visit <http://localhost:8080/test.html>. If you see a big green square with JS on it, you're good.
 
+You can also install the module using `pip` for local development. This makes it easy to keep running the commandline tool as `vulcanize` but have it use the latest version of the code as you change it.
+
+```
+pip install -e .
+```
+
 #### 4. Building a new version
 
 Create a new tarball:

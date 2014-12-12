@@ -15,7 +15,6 @@
 # limitations under the License.
 
 from lxml import html
-import os
 
 from . import assembler
 from . import importer
@@ -24,19 +23,19 @@ from . import importer
 __all__ = ['vulcanize']
 
 
-def vulcanize(index_path):
+def vulcanize(root_dir, index_path):
     """Vulcanize the HTML file at the given path.
 
     Args:
+        root_dir: Path to the directory root for vulcanizing.
         index_path: Path to the HTML file to vulcanize.
 
     Returns:
         String of the vulcanized file.
     """
-    index_relative_url = os.path.basename(index_path)
-    resolver = importer.PathResolver(index_relative_url, index_path)
+    resolver = importer.PathResolver(root_dir, index_path)
     import_tag = importer.Importer(resolver)
-    root_file = import_tag.import_html(index_relative_url)
+    root_file = import_tag.import_html(resolver.index_relative_url)
     root_file.parse()
     traverser = assembler.Traverser(import_tag)
     root_el = assembler.assemble(root_file, traverser)

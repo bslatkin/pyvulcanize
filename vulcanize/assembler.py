@@ -53,6 +53,8 @@ class Traverser(object):
         # We'll ignore anything here that was already included in a dependency
         # deeper in the graph.
         for el in node.resource_tags:
+            logging.debug('Traversing %.60r...', html.tostring(el))
+
             try:
                 dep = self.import_tag(node.relative_url, el)
             except importer.InvalidScriptError as e:
@@ -123,7 +125,7 @@ def assemble(root_file, traverse):
     combined_script = StringIO()
 
     for tag in traverse(root_file):
-        logging.debug('Traversing %r', tag)
+        logging.debug('Assembling %r', tag)
 
         if isinstance(tag, importer.ImportedLink):
             if tag.replacement is not None:
