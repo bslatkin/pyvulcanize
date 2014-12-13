@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en"><head><script type="text/javascript">// From example/bower_components/webcomponentsjs/webcomponents.js
+<html lang="en"><head><script type="text/javascript">
+// From example/bower_components/webcomponentsjs/webcomponents.js
 /**
  * @license
  * Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
@@ -6375,6 +6376,7 @@ CustomElements.addModule(function(scope) {
   window.Platform = scope;
 })(window.WebComponents);
 ;
+
 // From example/bower_components/polymer/polymer.js
 /**
  * @license
@@ -18572,17 +18574,23 @@ polyfill-next-selector { content: 'I WIN'; }
   </template>
   
   
+</polymer-element><polymer-element noscript="" name="z-import">
+  <template>
+    Foobar!
+  </template>
 </polymer-element><polymer-element attributes="" name="x-foo">
   
   </polymer-element><polymer-element attributes="" name="x-bar">
   
-  </polymer-element></div><x-import>Hello Import!</x-import><y-import></y-import><script type="text/javascript">
+  </polymer-element></div><x-import>Hello Import!</x-import><y-import></y-import><z-import></z-import><script type="text/javascript">
     Polymer('y-import');
   
 ;
 
     Polymer('x-import');
   
+;
+Polymer('z-import');
 ;
 Polymer('x-foo')
 ;

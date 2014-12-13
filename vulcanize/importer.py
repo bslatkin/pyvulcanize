@@ -238,7 +238,12 @@ class ImportedPolymerElement(ImportedTag):
             assert name
             script_el = html.Element('script')
             script_el.text = "Polymer('%s');" % name
-            self.resource_tags.append(script_el)
+            # Add the script as a child element at the end of polymer-element
+            # so it will have polymer_element_ancestor set elsewhere in this
+            # file. Without that the dependency graph gets out of whack
+            # because the assembler assumes that the "noscript" Polymer()
+            # registration call can go in <head>.
+            self.el.append(script_el)
 
         for child_el in self.el.findall('.//*'):
             if child_el.tag not in ('script', 'link'):

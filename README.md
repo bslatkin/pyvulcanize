@@ -32,7 +32,6 @@ Bugs:
 
 - `@import` in linked stylesheets won't be inlined
 - `url()` or `@import` in linked stylesheets won't be adjusted for relative paths
-- No tests for [no-script Polymer elements](https://www.polymer-project.org/docs/polymer/polymer.html#altregistration) that don't explicitly call `Polymer()`
 
 Missing features:
 
