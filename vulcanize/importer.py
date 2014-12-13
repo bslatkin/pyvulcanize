@@ -234,10 +234,17 @@ class ImportedPolymerElement(ImportedTag):
         # Handle no-script Polymer elements that don't explicitly
         # call Polymer() in a child script tag.
         if 'noscript' in self.el.attrib:
+            # Delete the noscript attribute so the polymer framework doesn't
+            # try to compensate for the lack of the Polymer() call in the
+            # vulcanized output. If you don't do this the library will
+            # double initialize this polymer-element.
+            del self.el.attrib['noscript']
+
             name = self.el.attrib.get('name')
             assert name
             script_el = html.Element('script')
             script_el.text = "Polymer('%s');" % name
+
             # Add the script as a child element at the end of polymer-element
             # so it will have polymer_element_ancestor set elsewhere in this
             # file. Without that the dependency graph gets out of whack
