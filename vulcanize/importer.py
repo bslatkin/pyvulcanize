@@ -126,7 +126,7 @@ class ImportedScript(ImportedTag):
                 self.text = handle.read()
 
         if self.relative_url:
-            self.text = '// From %s\n%s' % (self.relative_url, self.text)
+            self.text = '\n// From %s\n%s' % (self.relative_url, self.text)
 
         if self.text:
             # Escape any </script> close tags because those will break the
@@ -231,8 +231,14 @@ class ImportedPolymerElement(ImportedTag):
             relative_url=parent_relative_url, path=None, el=polymer_el)
 
     def parse(self):
-        # TODO: Handle no-script Polymer elements that don't explicitly
+        # Handle no-script Polymer elements that don't explicitly
         # call Polymer() in a child script tag.
+        if 'noscript' in self.el.attrib:
+            name = self.el.attrib.get('name')
+            assert name
+            script_el = html.Element('script')
+            script_el.text = "Polymer('%s');" % name
+            self.resource_tags.append(script_el)
 
         for child_el in self.el.findall('.//*'):
             if child_el.tag not in ('script', 'link'):
